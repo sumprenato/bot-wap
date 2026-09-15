@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Bot WhatsApp</title>
+  <meta name="description" content="Acesse o painel do seu Bot WhatsApp">
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  
+  <!-- Glowing background elements -->
+  <div class="bg-glow glow-1"></div>
+  <div class="bg-glow glow-2"></div>
+  <div class="bg-glow glow-3"></div>
+
+  <div class="login-card">
+    <div class="login-header">
+      <h1>Bem-vindo de volta</h1>
+      <p>Acesse o painel de controle do Bot</p>
+    </div>
+    
+    <form id="loginForm">
+      <div class="input-group">
+        <label for="username">Usuário</label>
+        <input type="text" id="username" placeholder="Digite seu usuário" required autocomplete="username">
+      </div>
+      
+      <div class="input-group">
+        <label for="password">Senha</label>
+        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      
+      <button type="submit" class="login-btn">Entrar no Painel</button>
+      <p id="errorMsg" style="color: #ff6b6b; font-size: 13px; margin-top: 16px; text-align: center; font-weight: 500; display: none;"></p>
+    </form>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    const API_BASE = window.BACKEND_URL || '';
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const btn = document.querySelector('.login-btn');
+      const errorMsg = document.getElementById('errorMsg');
+      
+      errorMsg.style.display = 'none';
+      const originalText = btn.textContent;
+      btn.textContent = 'Autenticando...';
+      btn.style.opacity = '0.8';
+      btn.disabled = true;
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          window.location.href = '/dashboard.html';
+        } else {
+          errorMsg.textContent = data.error || 'Credenciais inválidas';
+          errorMsg.style.display = 'block';
+          btn.textContent = originalText;
+          btn.style.opacity = '1';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        errorMsg.textContent = 'Erro de conexão ao servidor.';
+        errorMsg.style.display = 'block';
+        btn.textContent = originalText;
+        btn.style.opacity = '1';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

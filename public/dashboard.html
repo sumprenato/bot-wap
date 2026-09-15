@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel — Bot WhatsApp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" id="connDot"></span>
+        <div style="flex: 1;">
+          <h1>Painel do Bot</h1>
+          <button class="profile-trigger" id="profileBtn" type="button">admin —</button>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button id="disconnectBtn" style="background: transparent; border: 1px solid rgba(248, 113, 113, 0.6); color: #fca5a5; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Desconectar</button>
+          <button id="logoutBtn" style="background: transparent; border: 1px solid var(--border); color: var(--text-faint); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Sair</button>
+        </div>
+      </div>
+
+      <div class="conn-card" id="connCard">
+        <div class="conn-row">
+          <span class="conn-label">conexão</span>
+          <span class="conn-value" id="connText">verificando…</span>
+        </div>
+        <div class="qr-wrap" id="qrWrap" hidden>
+          <p class="qr-hint">Escaneie com o WhatsApp do bot (Aparelhos conectados)</p>
+          <img id="qrImage" alt="QR Code de conexão" />
+        </div>
+      </div>
+
+      <div class="convo-header">
+        <span>conversas</span>
+        <span class="convo-count" id="convoCount">0</span>
+      </div>
+      <ul class="convo-list" id="convoList"></ul>
+    </aside>
+
+    <main class="chat">
+      <header class="chat-header">
+        <div>
+          <h2 id="chatTitle">Selecione uma conversa</h2>
+          <p class="chat-sub" id="chatSub">as mensagens aparecem aqui em tempo real</p>
+        </div>
+        <div class="chat-actions">
+          <button class="action-btn" id="blockBtn" hidden>bloquear</button>
+          <button class="action-btn subtle" id="clearBtn" hidden>limpar</button>
+          <button class="action-btn danger" id="deleteBtn" hidden>apagar</button>
+          <button class="assume-btn" id="assumeBtn" hidden>assumir conversa</button>
+        </div>
+      </header>
+
+      <div class="new-chat-bar" id="newChatBar">
+        <input type="text" id="newChatInput" placeholder="Número do cliente (ex.: 5511999999999)" autocomplete="off" />
+        <button type="button" id="newChatBtn">abrir conversa</button>
+      </div>
+
+      <div class="chat-log" id="chatLog">
+        <div class="empty-state">
+          <p>Nenhuma conversa selecionada.</p>
+          <p class="empty-sub">Mensagens de clientes vão aparecer na lista à esquerda assim que chegarem.</p>
+        </div>
+      </div>
+
+      <form class="composer" id="composer" hidden>
+        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden />
+        <button type="button" class="attach-btn" id="attachBtn" title="Anexar arquivo">anexar</button>
+        <input type="text" id="composerInput" placeholder="Escrever mensagem…" autocomplete="off" />
+        <button type="submit">enviar</button>
+      </form>
+    </main>
+  </div>
+
+  <div class="profile-modal" id="profileModal" hidden>
+    <div class="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+      <div class="profile-panel-head">
+        <div>
+          <p class="eyebrow">conta do painel</p>
+          <h2 id="profileTitle">Meu perfil</h2>
+        </div>
+        <button class="profile-close" id="profileClose" type="button" aria-label="Fechar perfil">×</button>
+      </div>
+      <form id="profileForm" class="profile-form">
+        <label for="profileUsername">Usuário</label>
+        <input id="profileUsername" name="username" type="text" minlength="3" maxlength="40" autocomplete="username" required />
+        <label for="profileCurrentPassword">Senha atual</label>
+        <input id="profileCurrentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
+        <div class="profile-divider">alterar senha <span>opcional</span></div>
+        <label for="profileNewPassword">Nova senha</label>
+        <input id="profileNewPassword" name="newPassword" type="password" minlength="6" autocomplete="new-password" />
+        <label for="profileConfirmPassword">Confirmar nova senha</label>
+        <input id="profileConfirmPassword" name="confirmPassword" type="password" minlength="6" autocomplete="new-password" />
+        <p class="profile-error" id="profileError" hidden></p>
+        <button class="profile-save" type="submit">Salvar alterações</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="config.js"></script>
+  <script src="/app.js?v=20260915-2"></script>
+</body>
+</html>

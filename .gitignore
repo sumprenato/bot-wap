@@ -1,0 +1,12 @@
+node_modules/
+.env
+auth_info/*
+!auth_info/.gitkeep
+media/*
+!media/.gitkeep
+storage/
+session-state.json
+conversations.json
+database.sqlite
+.DS_Store
+npm-debug.log*

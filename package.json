@@ -1,0 +1,27 @@
+{
+  "name": "bot-wap",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot WhatsApp que encaminha mensagens de clientes para o seu numero, permite assumir a conversa manualmente com !assumir, e conta com uma dashboard web para acompanhar tudo.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "bot-only": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "dotenv": "^16.4.5",
+    "express": "^4.22.3",
+    "express-session": "^1.19.0",
+    "multer": "^2.4.0",
+    "pg": "^8.23.0",
+    "pino": "^9.3.2",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.7.5",
+    "sqlite3": "^6.0.1"
+  }
+}
