@@ -3,81 +3,173 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — Bot WhatsApp</title>
-  <meta name="description" content="Acesse o painel do seu Bot WhatsApp">
+  <title>Login — Bot WAP</title>
+  <meta name="description" content="Acesse o painel de atendimento do Bot WAP e gerencie suas conversas no WhatsApp em tempo real.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="login.css">
 </head>
 <body>
-  
   <!-- Glowing background elements -->
   <div class="bg-glow glow-1"></div>
   <div class="bg-glow glow-2"></div>
   <div class="bg-glow glow-3"></div>
 
   <div class="login-card">
+    <div class="login-brand">
+      <span class="login-brand-mark"></span>
+      <span>BOT <b>WAP</b></span>
+    </div>
     <div class="login-header">
-      <h1>Bem-vindo de volta</h1>
-      <p>Acesse o painel de controle do Bot</p>
+      <p class="login-kicker">central de atendimento</p>
+      <h1 id="authTitle">Seu atendimento,<br><em>no controle.</em></h1>
+      <p id="authDescription">Conecte o WhatsApp e acompanhe cada conversa em tempo real.</p>
+    </div>
+
+    <div class="auth-tabs" role="tablist" aria-label="Acesso ao painel">
+      <button type="button" class="auth-tab is-active" id="loginTab" role="tab" aria-selected="true">Entrar</button>
+      <button type="button" class="auth-tab" id="registerTab" role="tab" aria-selected="false">Criar acesso</button>
     </div>
     
-    <form id="loginForm">
+    <form id="loginForm" novalidate>
       <div class="input-group">
         <label for="username">Usuário</label>
-        <input type="text" id="username" placeholder="Digite seu usuário" required autocomplete="username">
+        <input type="text" id="username" placeholder="ID para entrar no painel" minlength="3" maxlength="40" pattern="[A-Za-z0-9_.-]+" autocapitalize="none" spellcheck="false" required autocomplete="username">
+      </div>
+
+      <div class="input-group register-fields" id="displayNameField" hidden>
+        <label for="displayName">Nome no painel</label>
+        <input type="text" id="displayName" placeholder="Nome que aparecerá nas mensagens" maxlength="60" autocomplete="name">
+      </div>
+
+      <div class="input-group register-fields" id="whatsappNumberField" hidden>
+        <label for="whatsappNumber">Número do WhatsApp</label>
+        <input type="tel" id="whatsappNumber" placeholder="+55 (11) 99999-9999" inputmode="tel" pattern="[+]55 \([0-9]{2}\) 9[0-9]{4}-[0-9]{4}" maxlength="19" autocomplete="tel">
       </div>
       
       <div class="input-group">
         <label for="password">Senha</label>
-        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+        <div class="password-field">
+          <input type="password" id="password" placeholder="Sua senha" required autocomplete="current-password">
+          <button type="button" id="togglePassword" aria-label="Mostrar senha">mostrar</button>
+        </div>
       </div>
       
-      <button type="submit" class="login-btn">Entrar no Painel</button>
-      <p id="errorMsg" style="color: #ff6b6b; font-size: 13px; margin-top: 16px; text-align: center; font-weight: 500; display: none;"></p>
+      <div class="register-fields" id="registerFields" hidden>
+        <div class="input-group">
+          <label for="confirmPassword">Confirmar senha</label>
+          <input type="password" id="confirmPassword" placeholder="Repita sua senha" autocomplete="new-password">
+        </div>
+      </div>
+
+      <button type="submit" class="login-btn" id="authSubmit">Entrar no Painel</button>
+      <p id="errorMsg" class="error-msg" hidden></p>
     </form>
+    <p class="login-footnote"><span></span> ambiente protegido e privado</p>
   </div>
 
   <script src="config.js"></script>
   <script>
     const API_BASE = window.BACKEND_URL || '';
+    let authMode = 'login';
+    const loginTab = document.getElementById('loginTab');
+    const registerTab = document.getElementById('registerTab');
+    const registerFields = document.getElementById('registerFields');
+    const displayNameField = document.getElementById('displayNameField');
+    const displayName = document.getElementById('displayName');
+    const whatsappNumberField = document.getElementById('whatsappNumberField');
+    const whatsappNumber = document.getElementById('whatsappNumber');
+    const authTitle = document.getElementById('authTitle');
+    const authDescription = document.getElementById('authDescription');
+    const authSubmit = document.getElementById('authSubmit');
+    const confirmPassword = document.getElementById('confirmPassword');
+    const errorMsg = document.getElementById('errorMsg');
+
+    function formatWhatsappNumber(value) {
+      const digits = String(value || '').replace(/\D/g, '').slice(0, 13);
+      if (!digits) return '';
+      if (!digits.startsWith('55')) return `+${digits}`;
+      if (digits.length <= 2) return `+${digits}`;
+      if (digits.length <= 4) return `+55 (${digits.slice(2)}`;
+      if (digits.length <= 9) return `+55 (${digits.slice(2, 4)}) ${digits.slice(4)}`;
+      return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+    }
+
+    whatsappNumber.addEventListener('input', () => {
+      whatsappNumber.value = formatWhatsappNumber(whatsappNumber.value);
+    });
+
+    function setAuthMode(mode) {
+      authMode = mode;
+      const isRegister = mode === 'register';
+      loginTab.classList.toggle('is-active', !isRegister);
+      registerTab.classList.toggle('is-active', isRegister);
+      loginTab.setAttribute('aria-selected', String(!isRegister));
+      registerTab.setAttribute('aria-selected', String(isRegister));
+      registerFields.hidden = !isRegister;
+      displayNameField.hidden = !isRegister;
+      whatsappNumberField.hidden = !isRegister;
+      confirmPassword.required = isRegister;
+      displayName.required = isRegister;
+      whatsappNumber.required = isRegister;
+      authTitle.innerHTML = isRegister ? 'Crie seu <em>acesso.</em>' : 'Seu atendimento,<br><em>no controle.</em>';
+      authDescription.textContent = isRegister ? 'Cadastre um operador para acompanhar os atendimentos.' : 'Conecte o WhatsApp e acompanhe cada conversa em tempo real.';
+      authSubmit.textContent = isRegister ? 'Criar acesso' : 'Entrar no Painel';
+      errorMsg.hidden = true;
+    }
+
+    loginTab.addEventListener('click', () => setAuthMode('login'));
+    registerTab.addEventListener('click', () => setAuthMode('register'));
+
     document.getElementById('loginForm').addEventListener('submit', async function(e) {
       e.preventDefault();
-      
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
-      const btn = document.querySelector('.login-btn');
-      const errorMsg = document.getElementById('errorMsg');
+      const btn = authSubmit;
       
-      errorMsg.style.display = 'none';
+      errorMsg.hidden = true;
       const originalText = btn.textContent;
-      btn.textContent = 'Autenticando...';
-      btn.style.opacity = '0.8';
+      btn.textContent = authMode === 'register' ? 'Criando acesso…' : 'Autenticando…';
+      btn.classList.add('is-loading');
       btn.disabled = true;
       
       try {
-        const res = await fetch(`${API_BASE}/api/login`, {
+        const res = await fetch(`${API_BASE}/api/${authMode === 'register' ? 'register' : 'login'}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ username, displayName: displayName.value, whatsappNumber: whatsappNumber.value, password, confirmPassword: confirmPassword.value })
         });
         
         const data = await res.json();
         
         if (res.ok) {
-          window.location.href = '/dashboard.html';
+          btn.textContent = '✓ Entrando…';
+          const params = new URLSearchParams(window.location.search);
+          const redirect = params.get('redirect');
+          window.location.href = redirect && redirect.startsWith('/') ? redirect : '/atendimento';
         } else {
-          errorMsg.textContent = data.error || 'Credenciais inválidas';
-          errorMsg.style.display = 'block';
+          errorMsg.textContent = data.error || (authMode === 'register' ? 'Não foi possível criar o acesso.' : 'Credenciais inválidas');
+          errorMsg.hidden = false;
           btn.textContent = originalText;
-          btn.style.opacity = '1';
+          btn.classList.remove('is-loading');
           btn.disabled = false;
         }
       } catch (err) {
         errorMsg.textContent = 'Erro de conexão ao servidor.';
-        errorMsg.style.display = 'block';
+        errorMsg.hidden = false;
         btn.textContent = originalText;
-        btn.style.opacity = '1';
+        btn.classList.remove('is-loading');
         btn.disabled = false;
       }
+    });
+
+    document.getElementById('togglePassword').addEventListener('click', function() {
+      const password = document.getElementById('password');
+      const visible = password.type === 'text';
+      password.type = visible ? 'password' : 'text';
+      this.textContent = visible ? 'mostrar' : 'ocultar';
+      this.setAttribute('aria-label', visible ? 'Mostrar senha' : 'Ocultar senha');
     });
   </script>
 </body>

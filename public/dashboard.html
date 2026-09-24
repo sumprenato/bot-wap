@@ -3,106 +3,874 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel — Bot WhatsApp</title>
+  <title>Painel — Bot WAP</title>
+  <meta name="description" content="Painel de atendimento Bot WAP — gerencie conversas WhatsApp em tempo real." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
+    <!-- ===================== SIDEBAR ===================== -->
     <aside class="sidebar">
       <div class="brand">
         <span class="brand-mark" id="connDot"></span>
-        <div style="flex: 1;">
-          <h1>Painel do Bot</h1>
-          <button class="profile-trigger" id="profileBtn" type="button">admin —</button>
+        <div class="brand-copy">
+          <h1>Bot WAP</h1>
+          <button class="profile-trigger" id="profileBtn" type="button">carregando…</button>
         </div>
-        <div style="display: flex; gap: 6px; align-items: center;">
-          <button id="disconnectBtn" style="background: transparent; border: 1px solid rgba(248, 113, 113, 0.6); color: #fca5a5; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Desconectar</button>
-          <button id="logoutBtn" style="background: transparent; border: 1px solid var(--border); color: var(--text-faint); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Sair</button>
+        <div class="brand-actions">
+          <button id="disconnectBtn" class="header-btn header-btn-danger" type="button" title="Desconectar WhatsApp">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 1 1 5.64 6.64"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+          </button>
+          <button id="logoutBtn" class="header-btn" type="button" title="Sair do painel">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
         </div>
       </div>
 
+      <!-- Connection status card -->
       <div class="conn-card" id="connCard">
         <div class="conn-row">
-          <span class="conn-label">conexão</span>
+          <span class="conn-label">conexão WhatsApp</span>
           <span class="conn-value" id="connText">verificando…</span>
         </div>
         <div class="qr-wrap" id="qrWrap" hidden>
-          <p class="qr-hint">Escaneie com o WhatsApp do bot (Aparelhos conectados)</p>
-          <img id="qrImage" alt="QR Code de conexão" />
+          <p class="qr-hint">Escaneie com o WhatsApp do bot<br><strong>Aparelhos conectados → Conectar dispositivo</strong></p>
+          <div class="qr-frame">
+            <img id="qrImage" alt="QR Code de conexão" />
+          </div>
         </div>
       </div>
 
-      <div class="convo-header">
+      <!-- Navigation -->
+      <nav class="main-nav" aria-label="Navegação principal">
+        <button class="nav-item is-active" type="button" data-page="inbox" id="navInbox">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <span class="nav-label">Atendimento</span>
+          <span class="nav-badge" id="unreadBadge" hidden></span>
+        </button>
+        <button class="nav-item" type="button" data-page="overview" id="navOverview">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </span>
+          <span class="nav-label">Dashboard</span>
+        </button>
+        <button class="nav-item" type="button" data-page="kanban" id="navKanban">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="19"/><rect x="10" y="3" width="5" height="14"/><rect x="17" y="3" width="5" height="10"/></svg>
+          </span>
+          <span class="nav-label">Kanban</span>
+        </button>
+        <button class="nav-item" type="button" data-page="campaigns" id="navCampaigns">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </span>
+          <span class="nav-label">Campanhas</span>
+        </button>
+        <button class="nav-item" type="button" data-page="flows" id="navFlows">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </span>
+          <span class="nav-label">Fluxos</span>
+        </button>
+        <button class="nav-item" type="button" data-page="contacts" id="navContacts">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="nav-label">Contatos</span>
+          <strong class="nav-count" id="contactsNavCount">0</strong>
+        </button>
+        <button class="nav-item" type="button" data-page="webhooks" id="navWebhooks">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </span>
+          <span class="nav-label">Webhooks</span>
+        </button>
+        <button class="nav-item" type="button" data-page="settings" id="navSettings">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <span class="nav-label">Configurações</span>
+        </button>
+      </nav>
+
+      <!-- Inbox tools (only visible in inbox page) -->
+      <div class="inbox-tools" id="inboxTools">
+        <label class="search-box" for="conversationSearch">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="conversationSearch" placeholder="Buscar conversa…" autocomplete="off" />
+          <kbd>/</kbd>
+        </label>
+        <div class="conversation-filters" role="group" aria-label="Filtrar conversas">
+          <button type="button" class="filter-btn is-active" data-filter="all">todas</button>
+          <button type="button" class="filter-btn" data-filter="assumed">assumidas</button>
+          <button type="button" class="filter-btn" data-filter="blocked">bloqueadas</button>
+          <button type="button" class="filter-btn" data-filter="finalized">finalizadas</button>
+        </div>
+        <!-- Bulk actions bar -->
+        <div class="bulk-bar" id="bulkBar" hidden>
+          <span class="bulk-count" id="bulkCount">0 selecionadas</span>
+          <button type="button" class="bulk-btn" id="bulkTagsBtn">🏷️ Tags</button>
+          <button type="button" class="bulk-btn" id="bulkTransferBtn">↗️ Departamento</button>
+          <button type="button" class="bulk-btn bulk-btn-cancel" id="bulkCancelBtn">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="convo-header" id="inboxConvoHeader">
         <span>conversas</span>
         <span class="convo-count" id="convoCount">0</span>
       </div>
       <ul class="convo-list" id="convoList"></ul>
     </aside>
 
+    <!-- ===================== MAIN CONTENT ===================== -->
     <main class="chat">
-      <header class="chat-header">
-        <div>
-          <h2 id="chatTitle">Selecione uma conversa</h2>
-          <p class="chat-sub" id="chatSub">as mensagens aparecem aqui em tempo real</p>
-        </div>
-        <div class="chat-actions">
-          <button class="action-btn" id="blockBtn" hidden>bloquear</button>
-          <button class="action-btn subtle" id="clearBtn" hidden>limpar</button>
-          <button class="action-btn danger" id="deleteBtn" hidden>apagar</button>
-          <button class="assume-btn" id="assumeBtn" hidden>assumir conversa</button>
-        </div>
-      </header>
 
-      <div class="new-chat-bar" id="newChatBar">
-        <input type="text" id="newChatInput" placeholder="Número do cliente (ex.: 5511999999999)" autocomplete="off" />
-        <button type="button" id="newChatBtn">abrir conversa</button>
-      </div>
+      <!-- ===== PAGE: INBOX ===== -->
+      <section class="page-view" id="inboxPage" data-page-view="inbox">
+        <header class="chat-header">
+          <div class="chat-header-info">
+            <div class="chat-avatar" id="chatAvatar"></div>
+            <div>
+              <h2 id="chatTitle">Selecione uma conversa</h2>
+              <p class="chat-sub" id="chatSub">as mensagens aparecem aqui em tempo real</p>
+            </div>
+          </div>
+          <div class="chat-actions" id="chatActions">
+            <button class="action-btn" id="tagsBtn" hidden title="Gerenciar tags">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              <span>tags</span>
+            </button>
+            <button class="action-btn" id="finalizeBtn" hidden title="Finalizar conversa">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>finalizar</span>
+            </button>
+            <button class="action-btn" id="blockBtn" hidden title="Bloquear">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <span>bloquear</span>
+            </button>
+            <button class="action-btn subtle" id="clearBtn" hidden title="Limpar histórico">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              <span>limpar</span>
+            </button>
+            <button class="action-btn danger" id="deleteBtn" hidden title="Apagar conversa">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+              <span>apagar</span>
+            </button>
+            <button class="assume-btn" id="assumeBtn" hidden>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              assumir conversa
+            </button>
+          </div>
+        </header>
 
-      <div class="chat-log" id="chatLog">
-        <div class="empty-state">
-          <p>Nenhuma conversa selecionada.</p>
-          <p class="empty-sub">Mensagens de clientes vão aparecer na lista à esquerda assim que chegarem.</p>
+        <!-- Mini stats bar -->
+        <section class="overview" aria-label="Resumo do atendimento">
+          <div class="overview-item" id="overviewCardOpen" style="cursor:pointer" title="Ver conversas abertas">
+            <span class="overview-label">abertas</span>
+            <strong id="overviewConversations">0</strong>
+          </div>
+          <div class="overview-item" id="overviewCardAssumed" style="cursor:pointer" title="Ver conversas assumidas">
+            <span class="overview-label">assumidas</span>
+            <strong id="overviewAssumed">0</strong>
+          </div>
+          <div class="overview-item overview-status">
+            <span class="overview-label">canal</span>
+            <strong id="overviewStatus">verificando</strong>
+          </div>
+        </section>
+
+        <!-- Tags pills row -->
+        <div class="active-tags-row" id="activeTagsRow" hidden>
+          <span class="active-tags-label">tags:</span>
+          <div class="active-tags-pills" id="activeTagsPills"></div>
         </div>
-      </div>
 
-      <form class="composer" id="composer" hidden>
-        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden />
-        <button type="button" class="attach-btn" id="attachBtn" title="Anexar arquivo">anexar</button>
-        <input type="text" id="composerInput" placeholder="Escrever mensagem…" autocomplete="off" />
-        <button type="submit">enviar</button>
-      </form>
+        <!-- New conversation bar -->
+        <div class="new-chat-bar" id="newChatBar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <input type="text" id="newChatInput" placeholder="Número do cliente (ex.: 5511999999999)" autocomplete="off" />
+          <button type="button" id="newChatBtn">abrir conversa</button>
+        </div>
+
+        <!-- Chat messages -->
+        <div class="chat-log" id="chatLog">
+          <div class="empty-state">
+            <div class="empty-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <p>Nenhuma conversa selecionada</p>
+            <p class="empty-sub">Mensagens de clientes vão aparecer na lista à esquerda assim que chegarem.</p>
+          </div>
+        </div>
+
+        <!-- Message composer -->
+        <form class="composer" id="composer" hidden>
+          <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden />
+          <div class="composer-attach">
+            <button type="button" class="attach-btn" id="attachBtn" title="Anexar arquivo">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
+          </div>
+          <div class="composer-input-wrap">
+            <div class="file-preview" id="filePreview" hidden>
+              <span id="filePreviewName"></span>
+              <button type="button" id="removeFileBtn" title="Remover arquivo">×</button>
+            </div>
+            <textarea id="composerInput" placeholder="Escrever mensagem…" rows="1" autocomplete="off"></textarea>
+          </div>
+          <button type="submit" class="send-btn" id="sendBtn" title="Enviar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+      </section>
+
+      <!-- ===== PAGE: DASHBOARD ===== -->
+      <section class="page-view page-panel" id="overviewPage" data-page-view="overview">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">operação</p>
+              <h2>Dashboard</h2>
+              <p>Métricas em tempo real do seu atendimento.</p>
+            </div>
+            <div class="page-heading-meta">
+              <span class="page-date" id="overviewDate"></span>
+              <span class="status-pill" id="overviewStatusPill">
+                <span class="status-dot"></span>
+                <span id="overviewChannel">offline</span>
+              </span>
+            </div>
+          </header>
+
+          <!-- Metric cards — clickable -->
+          <div class="metric-grid">
+            <article class="metric-card metric-card--primary" id="dashCardOpen" style="cursor:pointer" title="Ver conversas abertas">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <span>Conversas Abertas</span>
+              <strong id="overviewTotal">0</strong>
+              <small>em andamento agora</small>
+            </article>
+            <article class="metric-card metric-card--contacts" id="dashCardFinalized" style="cursor:pointer" title="Ver conversas finalizadas">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span>Finalizadas</span>
+              <strong id="overviewFinalized">0</strong>
+              <small>conversas encerradas</small>
+            </article>
+            <article class="metric-card metric-card--messages">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              </div>
+              <span>Mensagens</span>
+              <strong id="overviewMessages">0</strong>
+              <small>em todas as conversas</small>
+            </article>
+            <article class="metric-card metric-card--status">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </div>
+              <span>Canal</span>
+              <strong id="overviewChannelCard">offline</strong>
+              <small>status do WhatsApp</small>
+            </article>
+            <!-- Kanban metrics -->
+            <article class="metric-card metric-card--kanban">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <span>Receita (Ganhos)</span>
+              <strong id="overviewRevenue">R$ 0</strong>
+              <small>oportunidades ganhas</small>
+            </article>
+            <article class="metric-card metric-card--conversion">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              </div>
+              <span>Taxa de Conversão</span>
+              <strong id="overviewConversion">0%</strong>
+              <small>oportunidades ganhas/total</small>
+            </article>
+          </div>
+
+          <!-- Recent conversations -->
+          <div class="panel-section">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">atividade recente</p>
+                <h3>Conversas em andamento</h3>
+              </div>
+              <button class="text-action" type="button" data-page-link="inbox">
+                ver atendimento
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+            </div>
+            <div class="overview-list" id="overviewList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: KANBAN ===== -->
+      <section class="page-view page-panel" id="kanbanPage" data-page-view="kanban">
+        <div class="page-panel-inner kanban-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">oportunidades</p>
+              <h2>Kanban</h2>
+              <p>Gerencie suas oportunidades de forma visual.</p>
+            </div>
+            <div class="page-heading-actions">
+              <button class="text-action" type="button" id="addKanbanColumnBtn">+ Coluna</button>
+              <button class="text-action" type="button" id="manageLossReasonsBtn">Motivos de Perda</button>
+            </div>
+          </header>
+          <div class="kanban-metrics" id="kanbanMetrics"></div>
+          <div class="kanban-board" id="kanbanBoard"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: CAMPANHAS ===== -->
+      <section class="page-view page-panel" id="campaignsPage" data-page-view="campaigns">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">marketing</p>
+              <h2>Campanhas</h2>
+              <p>Envie mensagens em massa para contatos segmentados por tags.</p>
+            </div>
+            <button class="text-action text-action--primary" type="button" id="newCampaignBtn">+ Nova Campanha</button>
+          </header>
+          <div class="campaigns-list" id="campaignsList"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: FLUXOS ===== -->
+      <section class="page-view page-panel" id="flowsPage" data-page-view="flows">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">automação</p>
+              <h2>Fluxos</h2>
+              <p>Construa automações de atendimento com gatilhos e ações.</p>
+            </div>
+            <div class="page-heading-actions">
+              <button class="text-action" type="button" id="manageGlobalVarsBtn">🔧 Variáveis Globais</button>
+              <button class="text-action text-action--primary" type="button" id="newFlowBtn">+ Novo Fluxo</button>
+            </div>
+          </header>
+          <div class="flows-list" id="flowsList"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: CONTATOS ===== -->
+      <section class="page-view page-panel" id="contactsPage" data-page-view="contacts">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">base de relacionamento</p>
+              <h2>Contatos</h2>
+              <p>Contatos encontrados e salvos a partir da sua sessão WhatsApp.</p>
+            </div>
+            <label class="page-search" for="contactSearch">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="contactSearch" type="search" placeholder="Buscar contato…" />
+            </label>
+          </header>
+
+          <div class="contact-toolbar">
+            <span id="contactsCount" class="contacts-summary">0 contatos</span>
+            <div class="contact-sort" id="contactAlphaFilter">
+              <button type="button" class="alpha-btn is-active" data-alpha="all">Todos</button>
+              <button type="button" class="alpha-btn" data-alpha="A-H">A–H</button>
+              <button type="button" class="alpha-btn" data-alpha="I-P">I–P</button>
+              <button type="button" class="alpha-btn" data-alpha="Q-Z">Q–Z</button>
+              <button type="button" class="alpha-btn" data-alpha="0-9">#</button>
+            </div>
+            <button class="text-action" type="button" data-page-link="inbox">
+              iniciar atendimento
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+          </div>
+
+          <div class="contacts-grid" id="contactsGrid"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: WEBHOOKS ===== -->
+      <section class="page-view page-panel" id="webhooksPage" data-page-view="webhooks">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">integração</p>
+              <h2>Webhooks</h2>
+              <p>Receba notificações automáticas em sistemas externos.</p>
+            </div>
+            <button class="text-action text-action--primary" type="button" id="newWebhookBtn">+ Novo Webhook</button>
+          </header>
+          <label class="page-search" for="webhookSearch" style="margin-bottom:20px;display:flex;max-width:320px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="webhookSearch" type="search" placeholder="Buscar webhook…" />
+          </label>
+          <div class="webhooks-list" id="webhooksList"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: CONFIGURAÇÕES ===== -->
+      <section class="page-view page-panel" id="settingsPage" data-page-view="settings">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">controle do canal</p>
+              <h2>Configurações</h2>
+              <p>Gerencie a sessão, tags, departamentos e dados usados no atendimento.</p>
+            </div>
+          </header>
+
+          <!-- Session card -->
+          <div class="settings-group">
+            <h3 class="settings-group-title">Sessão WhatsApp</h3>
+            <div class="settings-card">
+              <div class="settings-card-icon settings-icon--whatsapp">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17z"/></svg>
+              </div>
+              <div class="settings-card-body">
+                <strong>Conexão WhatsApp</strong>
+                <p id="settingsConnection">Verificando conexão…</p>
+              </div>
+              <div class="settings-card-actions">
+                <button class="text-action text-action--danger" type="button" id="settingsDisconnect">desconectar</button>
+              </div>
+            </div>
+            <div class="settings-qr-hint" id="settingsQrHint" hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              O QR Code aparece na barra lateral. Escaneie para reconectar.
+            </div>
+          </div>
+
+          <!-- Profile card -->
+          <div class="settings-group">
+            <h3 class="settings-group-title">Perfil do atendente</h3>
+            <div class="settings-card">
+              <div class="settings-card-icon settings-icon--profile">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <div class="settings-card-body">
+                <strong>Perfil do Atendente</strong>
+                <p>Nome e número usados nas mensagens enviadas pelo painel.</p>
+                <p class="settings-profile-info" id="settingsProfileInfo"></p>
+              </div>
+              <div class="settings-card-actions">
+                <button class="text-action" type="button" id="settingsProfile">editar perfil</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tags management -->
+          <div class="settings-group">
+            <h3 class="settings-group-title">Tags</h3>
+            <div class="settings-card settings-card--borderless">
+              <div class="settings-card-body" style="width:100%">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                  <p style="margin:0;font-size:12px;color:var(--text-dim)">Crie e gerencie as tags para organizar contatos e conversas.</p>
+                  <button class="text-action" type="button" id="addTagBtn">+ Nova Tag</button>
+                </div>
+                <div id="tagsSettingsList" class="tags-settings-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Departments management -->
+          <div class="settings-group">
+            <h3 class="settings-group-title">Departamentos</h3>
+            <div class="settings-card settings-card--borderless">
+              <div class="settings-card-body" style="width:100%">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                  <p style="margin:0;font-size:12px;color:var(--text-dim)">Organize o atendimento por departamentos.</p>
+                  <button class="text-action" type="button" id="addDeptBtn">+ Novo Departamento</button>
+                </div>
+                <div id="deptsSettingsList" class="tags-settings-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Follow-ups -->
+          <div class="settings-group">
+            <h3 class="settings-group-title">Follow-ups Automáticos</h3>
+            <div class="settings-card settings-card--borderless">
+              <div class="settings-card-body" style="width:100%">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                  <p style="margin:0;font-size:12px;color:var(--text-dim)">Automatize o acompanhamento de conversas inativas.</p>
+                  <button class="text-action" type="button" id="addFollowupBtn">+ Novo Follow-up</button>
+                </div>
+                <div id="followupsList" class="tags-settings-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data card -->
+          <div class="settings-group">
+            <h3 class="settings-group-title">Dados & Histórico</h3>
+            <div class="settings-card">
+              <div class="settings-card-icon settings-icon--data">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              </div>
+              <div class="settings-card-body">
+                <strong>Histórico de mensagens</strong>
+                <p>As mensagens ficam armazenadas no banco da sua instalação (SQLite/PostgreSQL).</p>
+              </div>
+              <div class="settings-card-actions">
+                <span class="setting-state-badge">ativo</span>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="settings-card-icon settings-icon--info">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="settings-card-body">
+                <strong>Armazenamento</strong>
+                <p id="settingsStorageInfo">SQLite local · dados persistidos em volume</p>
+              </div>
+              <div class="settings-card-actions">
+                <span class="setting-state-badge setting-state-badge--neutral">local</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Danger zone -->
+          <div class="settings-group settings-group--danger">
+            <h3 class="settings-group-title settings-group-title--danger">Zona de Perigo</h3>
+            <div class="settings-card settings-card--danger">
+              <div class="settings-card-icon settings-icon--danger">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              </div>
+              <div class="settings-card-body">
+                <strong>Sair do painel</strong>
+                <p>Encerra a sessão de atendente. O bot continua rodando normalmente.</p>
+              </div>
+              <div class="settings-card-actions">
+                <button class="text-action text-action--danger" type="button" id="settingsLogout">sair agora</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
-  <div class="profile-modal" id="profileModal" hidden>
-    <div class="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
-      <div class="profile-panel-head">
+  <!-- ===================== MODAL: PERFIL ===================== -->
+  <div class="modal-overlay" id="profileModal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+      <div class="modal-head">
         <div>
           <p class="eyebrow">conta do painel</p>
           <h2 id="profileTitle">Meu perfil</h2>
         </div>
-        <button class="profile-close" id="profileClose" type="button" aria-label="Fechar perfil">×</button>
+        <button class="modal-close" id="profileClose" type="button" aria-label="Fechar perfil">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <form id="profileForm" class="profile-form">
-        <label for="profileUsername">Usuário</label>
-        <input id="profileUsername" name="username" type="text" minlength="3" maxlength="40" autocomplete="username" required />
-        <label for="profileCurrentPassword">Senha atual</label>
-        <input id="profileCurrentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
+        <div class="profile-field">
+          <label for="profileUsername">Usuário (ID de login)</label>
+          <input id="profileUsername" name="username" type="text" minlength="3" maxlength="40" pattern="[A-Za-z0-9_.-]+" autocapitalize="none" spellcheck="false" autocomplete="username" required />
+        </div>
+        <div class="profile-field">
+          <label for="profileDisplayName">Nome exibido nas mensagens</label>
+          <input id="profileDisplayName" name="displayName" type="text" maxlength="60" autocomplete="name" required />
+        </div>
+        <div class="profile-field">
+          <label for="profileWhatsappNumber">Número WhatsApp do bot</label>
+          <input id="profileWhatsappNumber" name="whatsappNumber" type="tel" inputmode="tel" pattern="[+]55 \([0-9]{2}\) 9[0-9]{4}-[0-9]{4}" maxlength="19" autocomplete="tel" required />
+          <span class="profile-field-hint">Formato: +55 (11) 99999-9999</span>
+        </div>
+        <div class="profile-field">
+          <label for="profileCurrentPassword">Senha atual <span class="required-mark">*</span></label>
+          <input id="profileCurrentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
+        </div>
         <div class="profile-divider">alterar senha <span>opcional</span></div>
-        <label for="profileNewPassword">Nova senha</label>
-        <input id="profileNewPassword" name="newPassword" type="password" minlength="6" autocomplete="new-password" />
-        <label for="profileConfirmPassword">Confirmar nova senha</label>
-        <input id="profileConfirmPassword" name="confirmPassword" type="password" minlength="6" autocomplete="new-password" />
+        <div class="profile-field">
+          <label for="profileNewPassword">Nova senha</label>
+          <input id="profileNewPassword" name="newPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" />
+        </div>
+        <div class="profile-field">
+          <label for="profileConfirmPassword">Confirmar nova senha</label>
+          <input id="profileConfirmPassword" name="confirmPassword" type="password" minlength="6" autocomplete="new-password" />
+        </div>
         <p class="profile-error" id="profileError" hidden></p>
-        <button class="profile-save" type="submit">Salvar alterações</button>
+        <button class="profile-save" type="submit" id="profileSaveBtn">Salvar alterações</button>
       </form>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: CONFIRMAÇÃO ===================== -->
+  <div class="modal-overlay" id="confirmModal" hidden>
+    <div class="modal-panel modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <div class="modal-head">
+        <h2 id="confirmTitle" class="confirm-title">Confirmar ação</h2>
+      </div>
+      <p class="confirm-body" id="confirmBody"></p>
+      <div class="confirm-actions">
+        <button type="button" class="confirm-cancel" id="confirmCancel">Cancelar</button>
+        <button type="button" class="confirm-ok" id="confirmOk">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: TAGS DE CONVERSA ===================== -->
+  <div class="modal-overlay" id="tagsModal" hidden>
+    <div class="modal-panel modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="tagsModalTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">organização</p>
+          <h2 id="tagsModalTitle">Gerenciar Tags</h2>
+        </div>
+        <button class="modal-close" id="tagsModalClose" type="button" aria-label="Fechar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="tagsModalContent"></div>
+      <div class="confirm-actions" style="margin-top:16px">
+        <button type="button" class="confirm-cancel" id="tagsModalClose2">Fechar</button>
+        <button type="button" class="profile-save" id="tagsModalSave">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: CAMPANHA ===================== -->
+  <div class="modal-overlay" id="campaignModal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="campaignModalTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">marketing</p>
+          <h2 id="campaignModalTitle">Nova Campanha</h2>
+        </div>
+        <button class="modal-close" id="campaignModalClose" type="button" aria-label="Fechar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="campaignForm" class="profile-form">
+        <div class="profile-field">
+          <label for="campaignName">Nome da campanha</label>
+          <input id="campaignName" type="text" placeholder="Ex.: Promoção de Setembro" required />
+        </div>
+        <div class="profile-field">
+          <label for="campaignMessage">Mensagem</label>
+          <textarea id="campaignMessage" rows="4" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);padding:10px 12px;font:13px var(--font-ui);resize:vertical;outline:none" placeholder="Texto da mensagem. Use {nome} para personalizar." required></textarea>
+        </div>
+        <div class="profile-field">
+          <label>Tags de envio (contatos com essas tags recebem)</label>
+          <div id="campaignTargetTagsPicker" class="tags-picker"></div>
+        </div>
+        <div class="profile-field">
+          <label>Tags de bloqueio (contatos com essas tags NÃO recebem)</label>
+          <div id="campaignBlockedTagsPicker" class="tags-picker tags-picker--danger"></div>
+        </div>
+        <div class="profile-field">
+          <label for="campaignScheduledAt">Agendar para (opcional)</label>
+          <input id="campaignScheduledAt" type="datetime-local" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);padding:10px 12px;font:13px var(--font-ui);outline:none" />
+        </div>
+        <p class="profile-error" id="campaignError" hidden></p>
+        <button class="profile-save" type="submit" id="campaignSaveBtn">Salvar Campanha</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: WEBHOOK ===================== -->
+  <div class="modal-overlay" id="webhookModal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="webhookModalTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">integração</p>
+          <h2 id="webhookModalTitle">Novo Webhook</h2>
+        </div>
+        <button class="modal-close" id="webhookModalClose" type="button" aria-label="Fechar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="webhookForm" class="profile-form">
+        <div class="profile-field">
+          <label for="webhookName">Nome</label>
+          <input id="webhookName" type="text" placeholder="Ex.: Notificação CRM" required />
+        </div>
+        <div class="profile-field">
+          <label for="webhookUrl">URL do endpoint</label>
+          <input id="webhookUrl" type="url" placeholder="https://meu-sistema.com/webhook" required />
+        </div>
+        <div class="profile-field">
+          <label>Eventos</label>
+          <div class="webhook-events-grid">
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="message.received" /> Nova mensagem recebida</label>
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="conversation.opened" /> Conversa aberta</label>
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="conversation.finalized" /> Conversa finalizada</label>
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="conversation.assumed" /> Conversa assumida</label>
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="contact.created" /> Contato criado</label>
+          </div>
+        </div>
+        <div class="profile-field">
+          <label for="webhookSecret">Secret (opcional, para validação HMAC)</label>
+          <input id="webhookSecret" type="text" placeholder="Chave secreta" />
+        </div>
+        <p class="profile-error" id="webhookError" hidden></p>
+        <button class="profile-save" type="submit" id="webhookSaveBtn">Salvar Webhook</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: OPORTUNIDADE ===================== -->
+  <div class="modal-overlay" id="opportunityModal" hidden>
+    <div class="modal-panel modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="opportunityModalTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">kanban</p>
+          <h2 id="opportunityModalTitle">Nova Oportunidade</h2>
+        </div>
+        <button class="modal-close" id="opportunityModalClose" type="button" aria-label="Fechar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="opportunityForm" class="profile-form">
+        <input type="hidden" id="opportunityId" />
+        <input type="hidden" id="opportunityColumnId" />
+        <div class="profile-field">
+          <label for="opportunityTitle">Título</label>
+          <input id="opportunityTitle" type="text" placeholder="Ex.: Contrato Empresa X" required />
+        </div>
+        <div class="profile-field">
+          <label for="opportunityContact">Contato (número)</label>
+          <input id="opportunityContact" type="text" placeholder="5511999999999" />
+        </div>
+        <div class="profile-field">
+          <label for="opportunityValue">Valor (R$)</label>
+          <input id="opportunityValue" type="number" min="0" step="0.01" placeholder="0,00" />
+        </div>
+        <p class="profile-error" id="opportunityError" hidden></p>
+        <button class="profile-save" type="submit" id="opportunitySaveBtn">Salvar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: PERDA ===================== -->
+  <div class="modal-overlay" id="loseModal" hidden>
+    <div class="modal-panel modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="loseModalTitle">
+      <div class="modal-head">
+        <h2 id="loseModalTitle" class="confirm-title">Marcar como Perdida</h2>
+      </div>
+      <div class="profile-field" style="margin-bottom:16px">
+        <label for="loseReasonSelect">Motivo de perda</label>
+        <select id="loseReasonSelect" style="width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-ui);outline:none">
+          <option value="">Sem motivo específico</option>
+        </select>
+      </div>
+      <div class="confirm-actions">
+        <button type="button" class="confirm-cancel" id="loseModalCancel">Cancelar</button>
+        <button type="button" class="confirm-ok" id="loseModalConfirm">Confirmar Perda</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: MOTIVOS DE PERDA ===================== -->
+  <div class="modal-overlay" id="lossReasonsModal" hidden>
+    <div class="modal-panel modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="lossReasonsTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">kanban</p>
+          <h2 id="lossReasonsTitle">Motivos de Perda</h2>
+        </div>
+        <button class="modal-close" id="lossReasonsClose" type="button" aria-label="Fechar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="lossReasonsContent" style="margin-bottom:16px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newLossReasonInput" placeholder="Nome do motivo…" style="flex:1;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-ui);outline:none" />
+        <button type="button" class="profile-save" style="margin-top:0;padding:9px 16px" id="addLossReasonBtn">+ Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: FLUXO ===================== -->
+  <div class="modal-overlay" id="flowModal" hidden>
+    <div class="modal-panel modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="flowModalTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">automação</p>
+          <h2 id="flowModalTitle">Novo Fluxo</h2>
+        </div>
+        <button class="modal-close" id="flowModalClose" type="button" aria-label="Fechar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="flowForm" class="profile-form">
+        <input type="hidden" id="flowId" />
+        <div class="profile-field">
+          <label for="flowName">Nome do fluxo</label>
+          <input id="flowName" type="text" placeholder="Ex.: Boas-vindas" required />
+        </div>
+        <div class="profile-field">
+          <label for="flowDescription">Descrição (opcional)</label>
+          <input id="flowDescription" type="text" placeholder="Para que serve este fluxo?" />
+        </div>
+        <div class="profile-field">
+          <label for="flowKeywords">Palavras-chave gatilho (separadas por vírgula)</label>
+          <input id="flowKeywords" type="text" placeholder="oi, olá, menu" />
+        </div>
+        <p class="profile-error" id="flowError" hidden></p>
+        <button class="profile-save" type="submit" id="flowSaveBtn">Salvar Fluxo</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: VARIÁVEIS GLOBAIS ===================== -->
+  <div class="modal-overlay" id="globalVarsModal" hidden>
+    <div class="modal-panel modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="globalVarsTitle">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">fluxos</p>
+          <h2 id="globalVarsTitle">Variáveis Globais</h2>
+        </div>
+        <button class="modal-close" id="globalVarsClose" type="button" aria-label="Fechar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <p style="font-size:12px;color:var(--text-dim);margin:0 0 16px">Use <code style="background:var(--surface-3);padding:2px 5px;border-radius:4px;font-family:var(--font-mono)">{global:CHAVE}</code> nos fluxos para inserir o valor.</p>
+      <div id="globalVarsList" style="margin-bottom:16px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newGlobalVarKey" placeholder="CHAVE" style="width:120px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-mono);outline:none;text-transform:uppercase" />
+        <input type="text" id="newGlobalVarValue" placeholder="valor" style="flex:1;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-ui);outline:none" />
+        <button type="button" class="profile-save" style="margin-top:0;padding:9px 16px;white-space:nowrap" id="addGlobalVarBtn">+ Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: TRANSFERÊNCIA EM MASSA ===================== -->
+  <div class="modal-overlay" id="bulkTransferModal" hidden>
+    <div class="modal-panel modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="bulkTransferTitle">
+      <div class="modal-head">
+        <h2 id="bulkTransferTitle" class="confirm-title">Transferência em Massa</h2>
+      </div>
+      <div class="profile-field" style="margin-bottom:16px">
+        <label for="bulkTransferDeptSelect">Departamento destino</label>
+        <select id="bulkTransferDeptSelect" style="width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-ui);outline:none">
+          <option value="">Selecione um departamento…</option>
+        </select>
+      </div>
+      <div class="confirm-actions">
+        <button type="button" class="confirm-cancel" id="bulkTransferCancel">Cancelar</button>
+        <button type="button" class="profile-save" style="margin:0" id="bulkTransferConfirm">Transferir</button>
+      </div>
     </div>
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="config.js"></script>
-  <script src="/app.js?v=20260915-2"></script>
+  <script src="/app.js?v=20260924-2"></script>
 </body>
 </html>

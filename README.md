@@ -32,6 +32,9 @@ acompanhar e responder tudo em tempo real.
 - **Armazenamento configurável** via `STORAGE_DIR`: banco SQLite, sessão do
   WhatsApp (`auth_info/`) e mídias (`media/`) ficam todos dentro dela, prontos
   para apontar para um Volume persistente no Railway.
+- **Contatos persistidos**: contatos enviados pela agenda do WhatsApp e nomes
+  identificados nas mensagens são salvos na tabela `contacts` e aparecem na
+  página Contatos do painel.
 - Pequenos ajustes de robustez (reconexão do Baileys, limpeza de arquivo
   temporário quando o envio de mídia falha, recriação da pasta `auth_info`
   após desconectar, etc.).
@@ -39,6 +42,29 @@ acompanhar e responder tudo em tempo real.
   (`auth_info/`), mídias e bancos de dados de exemplo que estavam
   **misturados no zip original** — continham dados reais de clientes e não
   deveriam ser versionados nem reaproveitados num novo ambiente.
+
+## Correções da versão 1.0.1
+
+- **Não respondia quando o contato chamava primeiro**: contatos novos chegam
+  com um ID interno do WhatsApp (`@lid`) em vez do telefone. O bot só lembrava
+  esse ID em memória; após qualquer restart ele tentava enviar para
+  `<id>@s.whatsapp.net` (inexistente) e a mensagem sumia sem erro. Agora o JID
+  real fica salvo no banco (`contacts.jid`) e é usado no envio. Também:
+  conversas iniciadas por você e respondidas via LID são mescladas, números BR
+  com/sem o 9 são tentados, número inexistente gera erro claro e mensagens
+  como localização/contato/figurinha aparecem no chat.
+- **Precisava de F5 / disconnect**:
+  - worker que caía só voltava quando alguém recarregava a página → agora o
+    servidor reinicia sozinho (espera crescente) e requisições pendentes não
+    ficam mais penduradas (timeout + rejeição quando o worker morre);
+  - sessão deslogada pelo celular exigia "disconnect" manual → agora limpa as
+    credenciais e gera um novo QR automaticamente;
+  - reconexão do WhatsApp tentava uma única vez → agora insiste com backoff;
+  - worker atendia pedidos antes do banco estar pronto (tela vazia no F5) →
+    agora espera o banco;
+  - painel resincroniza sozinho (volta de aba, internet, queda do socket e a
+    cada 10s/60s), e chat aberto por telefone acompanha a conversa quando o
+    servidor a guarda sob outro número (LID).
 
 ## Rodando localmente
 
@@ -49,9 +75,27 @@ cp .env.example .env
 npm start
 ```
 
+No PowerShell, use `Copy-Item .env.example .env`, edite o arquivo e substitua
+`ADMIN_NUMBER` pelo número real do WhatsApp que controlará o bot, somente com
+DDI e DDD. Sem essa variável o processo é encerrado de propósito antes de
+conectar ao WhatsApp.
+
 Abra **http://localhost:3000**. Faça login com `ADMIN_USERNAME`/`ADMIN_PASSWORD`
 (criados automaticamente no banco na primeira execução). O QR Code aparece na
 barra lateral — escaneie com o WhatsApp do número que vai ser o bot.
+
+No cadastro, `username` é o ID exclusivo usado somente para entrar no painel.
+O campo `display_name` (Nome no painel) é independente e é o nome mostrado no
+painel e usado na assinatura das mensagens enviadas pela dashboard. Usuários
+existentes recebem automaticamente o próprio `username` como nome exibido e
+podem alterá-lo em **Meu perfil**.
+
+Cada cadastro também informa um número WhatsApp próprio. Ao entrar no painel,
+esse número recebe uma sessão Baileys e um QR Code exclusivos, armazenados em
+`STORAGE_DIR/users/<id>/`. As conversas, bloqueios, mídias e sessão de cada
+usuário ficam isolados das demais contas. O histórico de mensagens e os
+contatos também ficam persistidos nessa mesma instalação. O número deve ser informado com DDI,
+somente dígitos, entre 10 e 15 caracteres.
 
 Sem Postgres configurado, os dados ficam em `./database.sqlite` (ou dentro de
 `STORAGE_DIR`, se você definir essa variável).
