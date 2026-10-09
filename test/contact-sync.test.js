@@ -153,6 +153,40 @@ test('ordinary incoming profile notifications do not start a blocking import', a
   assert.deepEqual(events, []);
 });
 
+test('saved-name, photo, alias and history updates stay in the background after the initial verified sync', async () => {
+  const ev = new EventEmitter(), events = [], saved = [], pendingSave = deferred();
+  const directory = new WhatsAppDirectory({ socket: { ev, resyncAppState: async () => {} },
+    store: { saveContact: async contact => { await pendingSave.promise; saved.push(contact); }, registerConversationAliases: async () => {} },
+    emit: (...event) => events.push(event) });
+  await directory.sync(); events.length = 0;
+  ev.emit('contacts.update', [{ id: '551199990001@s.whatsapp.net', name: 'Novo nome', imgUrl: 'changed' }]);
+  ev.emit('contacts.upsert', [{ id: '551199990002@s.whatsapp.net', lid: '1234567890@lid', phoneNumber: '551199990002@s.whatsapp.net', name: 'Outro contato' }]);
+  ev.emit('messaging-history.set', { contacts: [{ id: '551199990003@s.whatsapp.net', name: 'Historico' }] });
+  await tick();
+  assert.equal(directory.syncState.verified, true, 'in-flight incremental updates must not lock the composer');
+  assert.equal(directory.syncState.stage, 'ready');
+  assert.equal(events.some(([name]) => name === 'contacts:sync'), false, 'no flashing full-screen loader');
+  pendingSave.resolve(); await directory.queue;
+  assert.equal(saved.length, 3);
+  assert.equal(directory.syncState.verified, true);
+  assert.equal(events.some(([name]) => name === 'contacts:sync'), false);
+  assert.equal(events.filter(([name]) => name === 'contacts:updated').length, 3, 'updated names still refresh the panel');
+  assert.equal(events.some(([name]) => name === 'profile:updated'), true);
+});
+
+test('a new full snapshot still blocks and verifies the database after background updates', async () => {
+  const ev = new EventEmitter(); let verify = null;
+  const directory = new WhatsAppDirectory({ socket: { ev, resyncAppState: async () => {} },
+    store: { getContacts: async () => { if (verify) await verify.promise; return []; } }, emit() {} });
+  await directory.sync();
+  directory.syncedAt = 0; verify = deferred();
+  const sync = directory.sync(); await tick();
+  assert.equal(directory.syncState.verified, false);
+  assert.equal(directory.syncState.stage, 'verifying');
+  verify.resolve(); await sync;
+  assert.equal(directory.syncState.verified, true);
+});
+
 test('Baileys silently failing to confirm its snapshot cannot unlock the panel', async () => {
   let pulls = 0;
   const directory = new WhatsAppDirectory({

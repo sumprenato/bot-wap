@@ -34,7 +34,9 @@ class WhatsAppDirectory {
       // Profile notifications accompany every live message; they are not an agenda import.
       if (!contacts.length) return;
       this.pendingBatches++;
-      if (this.syncState.stage !== 'error' || this.syncPromise) {
+      // After the initial verified snapshot, names, photos and aliases arrive
+      // continuously. Persist them in the background without re-blocking chat.
+      if (!this.syncState.verified && (this.syncState.stage !== 'error' || this.syncPromise)) {
         this.updateSync({ syncing: true, verified: false, stage: 'loading', error: '' });
       }
       this.queue = this.queue
@@ -42,9 +44,6 @@ class WhatsAppDirectory {
         .catch((error) => { this.queueError = error; })
         .finally(() => {
           this.pendingBatches--;
-          if (!this.pendingBatches && !this.syncPromise && this.hasSnapshot) {
-            try { this.finishSync(); } catch { /* Exposed through syncState; retry remains available. */ }
-          }
         });
     };
     socket.ev.on("contacts.upsert", enqueue);
