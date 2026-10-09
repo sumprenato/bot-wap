@@ -8,7 +8,7 @@ const userJid = (value) =>
 const individual = (jid) => /@(s\.whatsapp\.net|lid)$/.test(jid || "");
 
 class WhatsAppDirectory {
-  constructor({ socket, store, emit, authKeys, connected = () => true, canSave = async () => true, readyForSync = async () => true, syncTimeoutMs = 180000 }) {
+  constructor({ socket, store, emit, authKeys, connected = () => true, canSave = async () => true, readyForSync = async () => true, syncTimeoutMs = 180000, syncLog, retryDelayMs = 3000 }) {
     this.socket = socket;
     this.store = store;
     this.emit = emit;
@@ -16,6 +16,8 @@ class WhatsAppDirectory {
     this.canSave = canSave;
     this.authKeys = authKeys;
     this.readyForSync = readyForSync;
+    this.syncLog = syncLog;
+    this.retryDelayMs = retryDelayMs;
     this.queue = Promise.resolve();
     this.photos = new Map();
     this.photoRequests = new Map();
@@ -134,20 +136,29 @@ class WhatsAppDirectory {
           "app-state-sync-version": { critical_unblock_low: null },
         });
       }
-      try {
-        await this.socket.resyncAppState(["critical_unblock_low"], true);
-      } finally {
-        // Baileys' buffered function does not flush a manually requested sync.
-        // Release contacts before draining/verifying the persistence queue, and
-        // release live-message events even if the request fails.
-        this.socket.ev.flush?.();
-      }
-      if (attempt !== this.syncAttempt) throw new Error('Sincronização expirada.');
-      if (this.authKeys?.get) {
-        const snapshot = await this.authKeys.get('app-state-sync-version', ['critical_unblock_low']);
-        if (!Number.isFinite(snapshot?.critical_unblock_low?.version)) {
-          throw new Error('O WhatsApp não confirmou a sincronização da agenda.');
+      for (let pull = 0; pull < 3; pull++) {
+        if (attempt !== this.syncAttempt) throw new Error('Sincronização expirada.');
+        if (!this.connected()) throw new Error('WhatsApp desconectado durante a sincronização.');
+        this.syncLog?.reset();
+        try {
+          await this.socket.resyncAppState(["critical_unblock_low"], true);
+        } finally {
+          // Baileys' buffered function does not flush a manually requested sync.
+          // Release contacts before draining/verifying the persistence queue, and
+          // release live-message events even if the request fails.
+          this.socket.ev.flush?.();
         }
+        if (attempt !== this.syncAttempt) throw new Error('Sincronização expirada.');
+        const snapshot = this.authKeys?.get
+          ? await this.authKeys.get('app-state-sync-version', ['critical_unblock_low']) : null;
+        const failure = this.syncLog?.getFailure();
+        if ((!this.authKeys?.get || Number.isFinite(snapshot?.critical_unblock_low?.version)) && !failure) break;
+        if (pull === 2) {
+          throw new Error(failure || 'O WhatsApp não confirmou a sincronização da agenda.');
+        }
+        // A first response may arrive before all the device's agenda keys.
+        // Give key-share messages time to arrive instead of requiring a new click.
+        await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
       }
       this.updateSync({ stage: 'verifying' });
       // History may enqueue another batch while the previous one is being saved.
@@ -170,7 +181,7 @@ class WhatsAppDirectory {
       }, this.syncTimeoutMs);
     })]).catch(error => {
       this.queueError = error;
-      this.updateSync({ syncing: false, verified: false, stage: 'error', error: 'Não foi possível concluir a carga dos contatos. Tente novamente.' });
+      this.updateSync({ syncing: false, verified: false, stage: 'error', error: this.syncLog?.getFailure() || 'Não foi possível concluir a carga dos contatos. Tente novamente.' });
       throw error;
     }).finally(() => {
       clearTimeout(timer);

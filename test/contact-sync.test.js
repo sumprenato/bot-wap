@@ -154,10 +154,51 @@ test('ordinary incoming profile notifications do not start a blocking import', a
 });
 
 test('Baileys silently failing to confirm its snapshot cannot unlock the panel', async () => {
+  let pulls = 0;
   const directory = new WhatsAppDirectory({
-    socket: { ev: new EventEmitter(), resyncAppState: async () => {} }, store: {}, emit: () => {},
+    socket: { ev: new EventEmitter(), resyncAppState: async () => { pulls++; } }, store: {}, emit: () => {}, retryDelayMs: 1,
     authKeys: { set: async () => {}, get: async () => ({ critical_unblock_low: null }) },
   });
   await assert.rejects(directory.sync(), /não confirmou/);
+  assert.equal(pulls, 3, 'unconfirmed responses get bounded retries');
   assert.equal(directory.syncState.verified, false);
+});
+
+test('late agenda keys can confirm a second pull without unlocking before database verification', async () => {
+  const ev = new EventEmitter(), saved = [], verify = deferred(); let pulls = 0;
+  const directory = new WhatsAppDirectory({ socket: { ev, resyncAppState: async () => {
+    if (++pulls === 2) ev.emit('contacts.upsert', [{ id: '551199990001@s.whatsapp.net', name: 'Agenda' }]);
+  } }, store: { saveContact: async contact => saved.push(contact), getContacts: () => verify.promise }, emit() {}, retryDelayMs: 1,
+    authKeys: { set: async () => {}, get: async () => ({ critical_unblock_low: pulls === 2 ? { version: 1 } : null }) } });
+  const sync = directory.sync();
+  while (pulls < 2) await new Promise(resolve => setTimeout(resolve, 1));
+  await tick();
+  assert.equal(saved.length, 1);
+  assert.equal(directory.syncState.verified, false);
+  verify.resolve(saved); await sync;
+  assert.equal(directory.syncState.verified, true); assert.equal(pulls, 2);
+});
+
+test('hidden decoding failures keep the panel blocked even with a previously confirmed cursor', async () => {
+  const { createContactSyncLog } = require('../whatsapp-sync-log');
+  const lines = [], syncLog = createContactSyncLog('6', line => lines.push(line)); let pulls = 0;
+  const directory = new WhatsAppDirectory({ socket: { ev: new EventEmitter(), resyncAppState: async () => {
+    pulls++;
+    syncLog.logger.info({ name: 'critical_unblock_low', error: 'Error: failed to find key "secret-key" to decode mutation\nprivate stack' }, 'failed to sync state from version');
+  } }, store: {}, emit() {}, syncLog, retryDelayMs: 1,
+    authKeys: { set: async () => {}, get: async () => ({ critical_unblock_low: { version: 1 } }) } });
+  await assert.rejects(directory.sync(), /chaves da agenda/);
+  assert.equal(pulls, 3); assert.equal(directory.syncState.verified, false);
+  assert.match(directory.syncState.error, /chaves da agenda/);
+  assert.equal(lines.some(line => /secret-key|private stack/.test(line)), false);
+});
+
+test('sync diagnostics omit message bodies, device keys and unrelated library logs', () => {
+  const { createContactSyncLog } = require('../whatsapp-sync-log');
+  const lines = [], log = createContactSyncLog('3', line => lines.push(line));
+  log.logger.info({ name: 'critical_unblock_low', error: 'failed to verify LTHash', message: 'private body', keys: ['private-key'] }, 'failed to sync state from version');
+  log.logger.warn({ error: 'unrelated', message: 'private body' }, 'unrelated socket log');
+  assert.equal(lines.length, 1); assert.match(log.getFailure(), /integridade/);
+  assert.equal(lines.some(line => /private|LTHash/.test(line)), false);
+  log.reset(); assert.equal(log.getFailure(), '');
 });

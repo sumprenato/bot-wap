@@ -13,6 +13,7 @@ const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const store = require('./store');
 const db = require('./db');
 const { WhatsAppDirectory } = require('./whatsapp-directory');
+const { createContactSyncLog } = require('./whatsapp-sync-log');
 const { accountNumber, savedIdentity } = require('./chip-identity');
 
 const STORAGE_DIR = process.env.STORAGE_DIR || __dirname;
@@ -321,9 +322,10 @@ async function startBot(emitter) {
     const identityReady = new Promise((resolve) => { acceptIdentity = resolve; });
     cancelIdentity = acceptIdentity;
 
+    const syncLog = createContactSyncLog(CHIP_ID);
     const sock = makeWASocket({
       auth: authState,
-      logger: pino({ level: 'silent' }),
+      logger: syncLog.logger,
       keepAliveIntervalMs: 25000,
       connectTimeoutMs: 60000,
       syncFullHistory: true,
@@ -349,7 +351,7 @@ async function startBot(emitter) {
         } catch (error) { console.warn('[RECEIPTS] Falha ao atualizar confirmação:', error.message); }
       }
     });
-    directoryRef = new WhatsAppDirectory({ socket: sock, store, authKeys: authState.keys,
+    directoryRef = new WhatsAppDirectory({ socket: sock, store, authKeys: authState.keys, syncLog,
       readyForSync: async () => {
         const keyId = authState.creds.myAppStateKeyId;
         if (!keyId) return false;

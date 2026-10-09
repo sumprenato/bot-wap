@@ -809,7 +809,7 @@ export function Application({ layout, page, title, onNavigate }) {
           {synchronizingChip.contactsSync.stage !== 'error' && <span className="contacts-sync-spinner" aria-hidden="true" />}
           <span className="contacts-sync-connected">WhatsApp conectado</span>
           <h2 id="contacts-sync-title">{synchronizingChip.contactsSync.stage === 'error' ? 'Não foi possível carregar os contatos' : synchronizingChip.contactsSync.stage === 'verifying' ? 'Verificando os contatos' : 'Carregando os contatos'}</h2>
-          <p id="contacts-sync-description" role="status">{synchronizingChip.contactsSync.stage === 'error' ? 'Tente novamente para concluir a sincronização e liberar o painel.' : 'Aguarde enquanto sincronizamos sua agenda. O painel será liberado ao concluir a carga e a verificação.'}</p>
+          <p id="contacts-sync-description" role="status">{synchronizingChip.contactsSync.stage === 'error' ? `${synchronizingChip.contactsSync.error || 'Não foi possível concluir a sincronização.'} Tente novamente para liberar o painel.` : 'Aguarde enquanto sincronizamos sua agenda. O painel será liberado ao concluir a carga e a verificação.'}</p>
           {synchronizingChip.name && <small>{synchronizingChip.name}</small>}
           {synchronizingChip.contactsSync.stage === 'error' && <button type="button" className="btn btn-primary" disabled={busy === 'contacts-sync'} onClick={async () => {
             setBusy('contacts-sync');
