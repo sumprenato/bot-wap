@@ -6,6 +6,69 @@ const { WhatsAppDirectory } = require('../whatsapp-directory');
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
+test('manual sync flushes the installed Baileys buffer before verifying contacts and subsequent live messages', async () => {
+  const { makeEventBuffer } = await import('@whiskeysockets/baileys');
+  const ev = makeEventBuffer({ debug() {}, trace() {} });
+  const saved = [], messages = [], verification = deferred();
+  ev.on('messages.upsert', event => messages.push(...event.messages));
+  const resyncAppState = ev.createBufferedFunction(async () => {
+    ev.emit('contacts.upsert', [{ id: '551199990001@s.whatsapp.net', name: 'Agenda' }]);
+    ev.emit('messages.upsert', { messages: [{ key: { id: 'buffered', remoteJid: '551199990001@s.whatsapp.net' }, message: { conversation: 'Celular' } }], type: 'notify' });
+  });
+  const directory = new WhatsAppDirectory({ socket: { ev, resyncAppState },
+    store: { saveContact: async contact => saved.push(contact), getContacts: () => verification.promise }, emit() {} });
+  const sync = directory.sync();
+  await tick();
+  assert.equal(ev.isBuffering(), false, 'manual sync must release the real event buffer');
+  assert.equal(saved.length, 1);
+  assert.equal(directory.syncState.verified, false, 'persisted contacts must still be verified');
+  assert.equal(messages.length, 1);
+  verification.resolve(saved); await sync;
+  ev.emit('messages.upsert', { messages: [{ key: { id: 'live', remoteJid: '551199990001@s.whatsapp.net' }, message: { conversation: 'Depois' } }], type: 'notify' });
+  assert.equal(messages.length, 2, 'live messages cannot remain stuck after manual sync');
+});
+
+test('fresh pairing waits for keys and the automatic initial buffer before resetting the contact cursor', async () => {
+  const ev = new EventEmitter();
+  let ready = false, buffering = true, resets = 0, pulls = 0;
+  ev.isBuffering = () => buffering;
+  const directory = new WhatsAppDirectory({ socket: { ev, resyncAppState: async () => { pulls++; } },
+    readyForSync: async () => ready, authKeys: { set: async () => { resets++; } }, store: {}, emit() {} });
+  const sync = directory.sync(); await tick();
+  assert.equal(resets, 0); assert.equal(pulls, 0);
+  ready = true;
+  await new Promise(resolve => setTimeout(resolve, 280));
+  assert.equal(resets, 0, 'do not interfere with the automatic history sync');
+  buffering = false;
+  await sync;
+  assert.equal(resets, 1); assert.equal(pulls, 1);
+  assert.equal(directory.syncState.verified, true);
+});
+
+test('manual sync releases the real event buffer on failure and remains blocked until retry succeeds', async () => {
+  const { makeEventBuffer } = await import('@whiskeysockets/baileys');
+  const ev = makeEventBuffer({ debug() {}, trace() {} }); let fail = true;
+  const directory = new WhatsAppDirectory({ socket: { ev,
+    resyncAppState: ev.createBufferedFunction(async () => { if (fail) throw new Error('Network unavailable'); }) }, store: {}, emit() {} });
+  await assert.rejects(directory.sync(), /Network unavailable/);
+  assert.equal(ev.isBuffering(), false);
+  assert.equal(directory.syncState.verified, false);
+  fail = false; await directory.sync();
+  assert.equal(directory.syncState.verified, true);
+});
+
+test('timed out key preparation cannot start a late snapshot or unlock the panel', async () => {
+  let ready = false, pulls = 0, resets = 0;
+  const directory = new WhatsAppDirectory({ socket: { ev: new EventEmitter(), resyncAppState: async () => { pulls++; } },
+    readyForSync: async () => ready, authKeys: { set: async () => { resets++; } }, store: {}, emit() {}, syncTimeoutMs: 20 });
+  await assert.rejects(directory.sync(), /demorou demais/);
+  ready = true;
+  await new Promise(resolve => setTimeout(resolve, 280));
+  assert.equal(resets, 0); assert.equal(pulls, 0);
+  assert.equal(directory.syncState.verified, false);
+  assert.equal(directory.syncState.stage, 'error');
+});
+
 test('sync blocks until all streaming batches and database verification finish, then emits one refresh', async () => {
   const ev = new EventEmitter(), first = deferred(), second = deferred(), verify = deferred(), events = [], saved = [];
   let pulls = 0;

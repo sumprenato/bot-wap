@@ -31,7 +31,7 @@ test('QR identity gates contacts/messages, persists the actual phone and refuses
           ws: { close() {} }, logout: async () => { socket.loggedOut = true; }, resyncAppState: async () => {}, sendMessage: async (jid, content, options) => { sent.push({ jid, content, options }); return { key: { id: `sent-${sent.length}`, remoteJid: jid, fromMe: true }, message: content.text ? { conversation: content.text } : {}, status: 1 }; } };
         sockets.push(socket); return socket;
       },
-      useMultiFileAuthState: async () => ({ state: { creds: {}, keys: { set: async () => {} } }, saveCreds: async () => {} }),
+      useMultiFileAuthState: async () => ({ state: { creds: { myAppStateKeyId: 'test-key' }, keys: { set: async () => {}, get: async (type) => type === 'app-state-sync-key' ? { 'test-key': {} } : { critical_unblock_low: { version: 1 } } } }, saveCreds: async () => {} }),
       downloadMediaMessage: async () => Buffer.from('test phone media'),
       DisconnectReason: { loggedOut: 401, badSession: 500 },
     };

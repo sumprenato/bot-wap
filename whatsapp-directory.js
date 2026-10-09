@@ -8,13 +8,14 @@ const userJid = (value) =>
 const individual = (jid) => /@(s\.whatsapp\.net|lid)$/.test(jid || "");
 
 class WhatsAppDirectory {
-  constructor({ socket, store, emit, authKeys, connected = () => true, canSave = async () => true, syncTimeoutMs = 180000 }) {
+  constructor({ socket, store, emit, authKeys, connected = () => true, canSave = async () => true, readyForSync = async () => true, syncTimeoutMs = 180000 }) {
     this.socket = socket;
     this.store = store;
     this.emit = emit;
     this.connected = connected;
     this.canSave = canSave;
     this.authKeys = authKeys;
+    this.readyForSync = readyForSync;
     this.queue = Promise.resolve();
     this.photos = new Map();
     this.photoRequests = new Map();
@@ -118,6 +119,14 @@ class WhatsAppDirectory {
     const attempt = ++this.syncAttempt;
     let timer;
     const work = (async () => {
+      // New pairings receive encryption keys and an automatic history sync after
+      // connection.open. Do not reset their cursor or flush their buffer mid-sync.
+      while (!(await this.readyForSync()) || this.socket.ev.isBuffering?.()) {
+        if (attempt !== this.syncAttempt) throw new Error('Sincronização expirada.');
+        if (!this.connected()) throw new Error('WhatsApp desconectado durante a sincronização.');
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      if (attempt !== this.syncAttempt) throw new Error('Sincronização expirada.');
       // Recover the complete address book even for sessions established before
       // this handler existed. Only reset the contact collection's local cursor.
       if (needsSnapshot && this.authKeys?.set) {
@@ -125,7 +134,14 @@ class WhatsAppDirectory {
           "app-state-sync-version": { critical_unblock_low: null },
         });
       }
-      await this.socket.resyncAppState(["critical_unblock_low"], true);
+      try {
+        await this.socket.resyncAppState(["critical_unblock_low"], true);
+      } finally {
+        // Baileys' buffered function does not flush a manually requested sync.
+        // Release contacts before draining/verifying the persistence queue, and
+        // release live-message events even if the request fails.
+        this.socket.ev.flush?.();
+      }
       if (attempt !== this.syncAttempt) throw new Error('Sincronização expirada.');
       if (this.authKeys?.get) {
         const snapshot = await this.authKeys.get('app-state-sync-version', ['critical_unblock_low']);

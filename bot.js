@@ -349,7 +349,14 @@ async function startBot(emitter) {
         } catch (error) { console.warn('[RECEIPTS] Falha ao atualizar confirmação:', error.message); }
       }
     });
-    directoryRef = new WhatsAppDirectory({ socket: sock, store, authKeys: authState.keys, canSave: async () => (await identityReady) && generation === socketGeneration && !manualDisconnect, emit: (event, payload) => {
+    directoryRef = new WhatsAppDirectory({ socket: sock, store, authKeys: authState.keys,
+      readyForSync: async () => {
+        const keyId = authState.creds.myAppStateKeyId;
+        if (!keyId) return false;
+        const keys = await authState.keys.get('app-state-sync-key', [keyId]);
+        return !!keys[keyId];
+      },
+      canSave: async () => (await identityReady) && generation === socketGeneration && !manualDisconnect, emit: (event, payload) => {
       if (generation === socketGeneration && !manualDisconnect) {
         if (event === 'contacts:sync') {
           status.contactsSync = payload;
