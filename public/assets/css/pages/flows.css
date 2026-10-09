@@ -1,0 +1,14 @@
+
+
+/* =====================================================
+   FLOWS
+   ===================================================== */
+.flow-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 10px;
+  transition: border-color var(--ease);
+}
+.flow-card:hover { border-color: var(--border); }

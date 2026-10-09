@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel — Bot WAP</title>
+  <meta name="description" content="Painel de atendimento Bot WAP — gerencie conversas WhatsApp em tempo real." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="/assets/js/storage.js"></script>
+  <script>document.documentElement.dataset.theme = window.BotWapStorage.local.get('bwap-theme') === 'light' ? 'light' : 'dark';</script>
+  <link rel="stylesheet" href="/assets/css/global.css?v=20261007-2" />
+  <link rel="stylesheet" href="/assets/css/controls.css?v=20261007-3" />
+  <link rel="stylesheet" href="/assets/css/pages/inbox.css?v=20261008-1" />
+
+  <link rel="stylesheet" href="/assets/css/motion.css?v=20261007-4" />
+  <script defer src="/assets/js/site.js?v=20261007-4"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- ===================== NAV SIDEBAR ===================== -->
+    <aside class="sidebar nav-sidebar" id="appNavigation">
+      <div class="brand">
+        <span class="brand-logo" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="m7 9 2 5 3-5 3 5 2-5"/></svg></span>
+        <div class="brand-copy">
+          <h1>Bot WAP</h1>
+          <span class="brand-subtitle">O espaço das suas conversas.</span>
+        </div>
+
+      </div>
+
+      <!-- Connection status card -->
+      <div class="conn-card" id="connCard">
+        <div class="conn-row">
+          <span class="conn-label">conexão WhatsApp</span>
+          <span class="conn-value" id="connText">verificando…</span>
+        </div>
+        <div class="qr-wrap" id="qrWrap" hidden>
+          <p class="qr-hint">Escaneie com o WhatsApp do bot<br><strong>Aparelhos conectados → Conectar dispositivo</strong></p>
+          <div class="qr-frame">
+            <img id="qrImage" alt="QR Code de conexão" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="main-nav" aria-label="Navegação principal"><div class="nav-section"><p class="nav-section-label">Atendimento</p><button class="nav-item" type="button" data-page="overview" id="navOverview">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </span>
+          <span class="nav-label">Dashboard</span>
+        </button>
+        <button class="nav-item is-active" type="button" data-page="inbox" id="navInbox">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <span class="nav-label">Atendimento</span>
+          <span class="nav-badge" id="unreadBadge" hidden></span>
+        </button>
+        <button class="nav-item" type="button" data-page="kanban" id="navKanban">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="19"/><rect x="10" y="3" width="5" height="14"/><rect x="17" y="3" width="5" height="10"/></svg>
+          </span>
+          <span class="nav-label">Funis</span>
+        </button>
+        <button class="nav-item" type="button" data-page="contacts" id="navContacts">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="nav-label">Contatos</span>
+          <strong class="nav-count" id="contactsNavCount">0</strong>
+        </button></div><div class="nav-section"><p class="nav-section-label">Campanhas e automações</p><button class="nav-item" type="button" data-page="campaigns" id="navCampaigns">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </span>
+          <span class="nav-label">Campanhas</span>
+        </button>
+        <button class="nav-item" type="button" data-page="flows" id="navFlows">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </span>
+          <span class="nav-label">Fluxos</span>
+        </button></div><div class="nav-section"><p class="nav-section-label">Organização e ajustes</p><button class="nav-item" type="button" data-page="team" id="navTeam"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="nav-label">Minha equipe</span></button><button class="nav-item" type="button" data-page="chips" id="navChips"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span><span class="nav-label">Meus chips</span></button>
+        <button class="nav-item" type="button" data-page="tags" id="navTags"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.83 0l3.35-3.35a2 2 0 0 0 0-2.83Z"/><circle cx="7.5" cy="7.5" r=".5"/></svg></span><span class="nav-label">Tags e rótulos</span></button>
+        <button class="nav-item" type="button" data-page="departments" id="navDepartments"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h.01M15 9h.01"/></svg></span><span class="nav-label">Departamentos</span></button>
+        <button class="nav-item" type="button" data-page="webhooks" id="navWebhooks">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </span>
+          <span class="nav-label">Webhooks</span>
+        </button>
+        <button class="nav-item" type="button" data-page="settings" id="navSettings">
+          <span class="nav-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <span class="nav-label">Configurações</span>
+        </button>
+        </div>
+      </nav>
+      <div class="sidebar-account"><button class="account-avatar" id="accountAvatarBtn" type="button" aria-label="Meu perfil" title="Meu perfil">W</button><div class="account-copy"><button class="profile-trigger" id="profileBtn" type="button">carregando…</button><button class="account-settings-link" id="myAccountBtn" type="button">Minha conta</button></div>        <div class="brand-actions">
+          
+          <button id="disconnectBtn" class="header-btn header-btn-danger" type="button" title="Desconectar WhatsApp" aria-label="Desconectar WhatsApp">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 1 1 5.64 6.64"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+          </button>
+          <button id="logoutBtn" class="header-btn" type="button" title="Sair do painel" aria-label="Sair do painel">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div></div>
+    </aside>
+
+    <header class="app-topbar">
+      <div class="topbar-location"><button type="button" class="topbar-menu" id="sidebarToggle" aria-label="Recolher menu lateral" aria-expanded="true" aria-controls="appNavigation"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></button><span class="topbar-divider"></span><strong id="currentPageLabel">Atendimento</strong></div>
+      <div class="topbar-tools"><a class="topbar-status" href="/chips" data-page-link="chips"><span class="brand-mark" id="connDot"></span><span id="topbarConnection">Verificando conexão</span></a><div class="topbar-themes" role="group" aria-label="Tema"><button type="button" class="theme-btn" data-theme="dark" aria-label="Tema escuro" title="Tema escuro">☾</button><button type="button" class="theme-btn" data-theme="light" aria-label="Tema claro" title="Tema claro">☀</button></div></div>
+    </header>
+
+    <!-- ===================== LIST SIDEBAR ===================== -->
+    <aside class="sidebar list-sidebar" id="listSidebar">
+      <div class="list-tabs">
+        <button class="list-tab is-active" data-tab="conversations" id="tabBtnConversations">Conversas</button>
+        <button class="list-tab" data-tab="contacts" id="tabBtnContacts">Contatos</button>
+      </div>
+
+      <!-- CONVERSAS TAB -->
+      <div class="list-tab-content is-active" id="tabConversations">
+        <!-- Inbox tools -->
+        <div class="inbox-tools" id="inboxTools">
+          <label class="search-box" for="conversationSearch">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="search" id="conversationSearch" placeholder="Buscar conversa…" autocomplete="off" />
+            <kbd>/</kbd>
+          </label>
+          <div class="conversation-filters" role="group" aria-label="Filtrar conversas">
+            <button type="button" class="filter-btn is-active" data-filter="all">todas</button>
+            <button type="button" class="filter-btn" data-filter="assumed">assumidas</button>
+            <button type="button" class="filter-btn" data-filter="blocked">bloqueadas</button>
+            <button type="button" class="filter-btn" data-filter="finalized">finalizadas</button>
+          </div>
+          <div id="inboxChannelSelect"></div>
+          <label class="search-box department-filter-wrap" for="departmentFilter">
+            <select id="departmentFilter" aria-label="Filtrar por departamento"><option value="all">Todos os departamentos</option><option value="none">Sem departamento</option></select>
+          </label>
+          <!-- Bulk actions bar -->
+          <div class="bulk-bar" id="bulkBar" hidden>
+            <span class="bulk-count" id="bulkCount">0 selecionadas</span>
+            <button type="button" class="bulk-btn" id="bulkTagsBtn">🏷️ Tags</button>
+            <button type="button" class="bulk-btn" id="bulkTransferBtn">↗️ Departamento</button>
+            <button type="button" class="bulk-btn bulk-btn-cancel" id="bulkCancelBtn">Cancelar</button>
+          </div>
+        </div>
+
+        <div class="convo-header" id="inboxConvoHeader">
+          <span>conversas</span>
+          <span class="convo-count" id="convoCount">0</span>
+        </div>
+        <ul class="convo-list" id="convoList"></ul>
+      </div>
+
+      <!-- CONTATOS TAB -->
+      <div class="list-tab-content" id="tabContacts" hidden>
+        <!-- Conteúdo preenchido dinamicamente pelo app.js, ou movido do contactsPage -->
+        <div class="inbox-tools">
+          <label class="search-box" for="contactSearch">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="contactSearch" type="search" placeholder="Buscar contato…" autocomplete="off" />
+          </label>
+          <div class="contact-toolbar-sidebar" style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span id="contactsCount" class="contacts-summary" style="font-size: 11px; color: var(--text-faint); font-weight: 600;">0 contatos</span>
+            <div class="contact-sort" id="contactAlphaFilter" style="display: flex; gap: 4px;">
+              <button type="button" class="alpha-btn is-active" data-alpha="all">Todos</button>
+              <button type="button" class="alpha-btn" data-alpha="A-H">A–H</button>
+              <button type="button" class="alpha-btn" data-alpha="I-P">I–P</button>
+              <button type="button" class="alpha-btn" data-alpha="Q-Z">Q–Z</button>
+            </div>
+          </div>
+        </div>
+        <div class="contacts-grid sidebar-contacts-list" id="contactsGrid"></div>
+      </div>
+    </aside>
+
+    <!-- ===================== MAIN CONTENT ===================== -->
+    <main class="chat">
+
+      <!-- ===== PAGE: INBOX ===== -->
+      <section class="page-view" id="inboxPage" data-page-view="inbox">
+        <header class="chat-header">
+          <div class="chat-header-info">
+            <div class="chat-avatar-wrap" id="chatAvatarWrap">
+              <div class="chat-avatar" id="chatAvatar"></div>
+              <img class="chat-avatar-photo" id="chatAvatarPhoto" alt="Foto de perfil" style="display:none" />
+            </div>
+            <div class="chat-contact-copy">
+              <div class="chat-contact-heading"><h2 id="chatTitle">Selecione uma conversa</h2><span id="chatStatus"></span><span id="chatDepartment"></span></div>
+              <p class="chat-sub" id="chatSub">as mensagens aparecem aqui em tempo real</p>
+            </div>
+          </div>
+          <div class="chat-actions" id="chatActions"></div>
+        </header>
+
+        <!-- Tags pills row -->
+        <div class="active-tags-row" id="activeTagsRow" hidden>
+          <span class="active-tags-label">tags:</span>
+          <div class="active-tags-pills" id="activeTagsPills"></div>
+        </div>
+
+        <!-- Stats bar escondida (mantida para compatibilidade JS) -->
+        <div style="display:none" aria-hidden="true">
+          <div id="overviewCardOpen"></div>
+          <div id="overviewCardAssumed"></div>
+          <strong id="overviewConversations">0</strong>
+          <strong id="overviewAssumed">0</strong>
+          <strong id="overviewStatus"></strong>
+          <input type="text" id="newChatInput" />
+          <button type="button" id="newChatBtn"></button>
+        </div>
+
+        <!-- Chat messages -->
+        <div class="chat-log" id="chatLog">
+          <div class="empty-state">
+            <div class="empty-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <p>Nenhuma conversa selecionada</p>
+            <p class="empty-sub">Mensagens de clientes vão aparecer na lista à esquerda assim que chegarem.</p>
+          </div>
+        </div>
+
+        <!-- Message composer -->
+        <form class="composer" id="composer" hidden>
+          <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden />
+          <div class="composer-attach">
+            <button type="button" class="attach-btn" id="attachBtn" title="Anexar arquivo">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
+            <button type="button" class="attach-btn emoji-trigger" id="emojiBtn" title="Inserir emoji">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            </button>
+          </div>
+          <div class="composer-input-wrap">
+            <div class="file-preview" id="filePreview" hidden>
+              <span id="filePreviewName"></span>
+              <button type="button" id="removeFileBtn" title="Remover arquivo">×</button>
+            </div>
+            <div id="messageReplyPreview"></div>
+            <textarea id="composerInput" placeholder="Escrever mensagem…" rows="1" autocomplete="off"></textarea>
+            <small id="composerSignature" style="color:var(--muted);font-size:11px"></small>
+          </div>
+          <button type="submit" class="send-btn" id="sendBtn" title="Enviar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+
+        <!-- Lightbox para foto de perfil -->
+        <div class="profile-lightbox" id="profileLightbox" hidden>
+          <div class="profile-lightbox-backdrop" id="profileLightboxBackdrop"></div>
+          <div class="profile-lightbox-content">
+            <button type="button" class="profile-lightbox-close" id="profileLightboxClose" aria-label="Fechar">&times;</button>
+            <img id="profileLightboxImg" alt="Foto de perfil ampliada" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: DASHBOARD ===== -->
+      <section class="page-view page-panel" id="overviewPage" data-page-view="overview">
+        <div class="page-panel-inner dashboard-inner">
+          <header class="page-heading dashboard-intro">
+            <svg class="dashboard-orbit" viewBox="0 0 280 200" fill="none" aria-hidden="true"><circle cx="156" cy="96" r="76"/><circle cx="156" cy="96" r="48"/><path d="M24 174 226 12M67 200 267 38"/><circle class="orbit-point" cx="101" cy="148" r="11"/><path class="orbit-spark" d="m226 84 6 17 17 6-17 6-6 17-6-17-17-6 17-6Z"/></svg>
+            <div>
+              <p class="eyebrow">seu espaço de conexões</p>
+              <h2>Dashboard</h2>
+              <p>Uma visão clara de cada conversa.</p>
+            </div>
+            <div class="page-heading-meta">
+              <span class="page-date" id="overviewDate"></span><span id="reportExportSlot"></span>
+              <span class="status-pill" id="overviewStatusPill">
+                <span class="status-dot"></span>
+                <span id="overviewChannel">offline</span>
+              </span>
+              <button type="button" class="text-action dashboard-open-inbox" data-page-link="inbox">Abrir atendimento <span aria-hidden="true">↗</span></button>
+            </div>
+          </header>
+          <h3 class="dashboard-section-label"><span class="live-indicator"></span> Atendimento em tempo real</h3>
+          <div class="metric-grid live-metrics"><article class="metric-card metric-card--primary" id="dashCardOpen" style="cursor:pointer" title="Ver conversas abertas">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <span>Conversas Abertas</span>
+              <strong id="overviewTotal">0</strong>
+              <small>em andamento agora</small>
+            </article><article class="metric-card metric-card--contacts" id="dashCardFinalized" style="cursor:pointer" title="Ver conversas finalizadas">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span>Finalizadas</span>
+              <strong id="overviewFinalized">0</strong>
+              <small>conversas encerradas</small>
+            </article><article class="metric-card metric-card--messages">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              </div>
+              <span>Mensagens</span>
+              <strong id="overviewMessages">0</strong>
+              <small>em todas as conversas</small>
+            </article><article class="metric-card metric-card--status">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </div>
+              <span>Canal</span>
+              <strong id="overviewChannelCard">offline</strong>
+              <small>status do WhatsApp</small>
+            </article></div>
+          <h3 class="dashboard-section-label">Resultados do atendimento</h3>
+          <div class="dashboard-report-grid">
+            <div class="dashboard-report-main">
+              <div class="metric-grid report-metrics"><article class="metric-card metric-card--kanban">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <span>Receita (Ganhos)</span>
+              <strong id="overviewRevenue">R$ 0</strong>
+              <small>oportunidades ganhas</small>
+            </article><article class="metric-card metric-card--conversion">
+              <div class="metric-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              </div>
+              <span>Taxa de Conversão</span>
+              <strong id="overviewConversion">0%</strong>
+              <small>oportunidades ganhas/total</small>
+            </article>
+                <article class="metric-card metric-card--contacts"><span>Base de contatos</span><strong id="overviewContactTotal">0</strong><small>contatos no chip principal</small></article>
+              </div>
+              <section class="activity-panel">
+                <div class="section-heading"><div><h3>Movimentação das mensagens</h3><p>Mensagens do histórico disponível no painel.</p></div><div class="period-buttons" role="group" aria-label="Período do gráfico"><button type="button" class="is-active" data-chart-days="7" aria-pressed="true">7 dias</button><button type="button" data-chart-days="30" aria-pressed="false">30 dias</button></div></div>
+                <div id="activityChartLegend" class="chart-legend"><span><i class="legend-received"></i>Recebidas</span><span><i class="legend-sent"></i>Enviadas</span></div>
+                <div id="activityChart" class="activity-chart" role="region" tabindex="0" aria-label="Mensagens por dia"></div>
+                <div id="activityChartEmpty" class="chart-empty" hidden><span class="chart-empty-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4v16h16M8 15v-4M13 15V7M18 15v-6"/></svg></span><strong>Sem movimentação neste período</strong><p>As mensagens recebidas e enviadas aparecerão aqui. Selecione outro período para consultar o histórico.</p></div>
+                <p id="activityChartSummary" class="chart-summary" aria-live="polite"></p>
+              </section>
+            </div>
+            <aside class="dashboard-recent"><div class="panel-section">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">atividade recente</p>
+                <h3>Conversas em andamento</h3>
+              </div>
+              <button class="text-action" type="button" data-page-link="inbox">
+                ver atendimento
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+            </div>
+            <div class="overview-list" id="overviewList"></div>
+          </div></aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: KANBAN ===== -->
+      <section class="page-view page-panel" id="kanbanPage" data-page-view="kanban">
+        <div class="page-panel-inner kanban-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">oportunidades</p>
+              <h2>Funis</h2>
+              <p>Acompanhe cada oportunidade, do primeiro contato ao fechamento.</p>
+            </div>
+            <div class="page-heading-actions">
+              <button class="text-action text-action--primary" type="button" id="addKanbanColumnBtn">+ Nova etapa</button>
+              <button class="text-action" type="button" id="manageLossReasonsBtn">Motivos de Perda</button>
+            </div>
+          </header>
+          <div class="kanban-metrics" id="kanbanMetrics"></div>
+          <label class="table-select funnel-status-filter" for="funnelStatus"><span>Exibir oportunidades</span><select id="funnelStatus"><option value="open">Em andamento</option><option value="won">Ganhas</option><option value="lost">Perdidas</option><option value="all">Todas</option></select></label>
+          <label class="table-search kanban-search" for="kanbanSearch"><input type="search" id="kanbanSearch" aria-label="Buscar oportunidade ou contato" placeholder="Buscar oportunidade ou contato" /></label><div class="kanban-board" id="kanbanBoard" role="region" tabindex="0" aria-label="Etapas e oportunidades"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: CAMPANHAS ===== -->
+      <section class="page-view page-panel" id="campaignsPage" data-page-view="campaigns">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">marketing</p>
+              <h2>Campanhas</h2>
+              <p>Envie mensagens em massa para contatos segmentados por tags.</p>
+            </div>
+            <button class="text-action text-action--primary" type="button" id="newCampaignBtn">+ Nova Campanha</button>
+          </header>
+          <div class="campaigns-list" id="campaignsList"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: FLUXOS ===== -->
+      <section class="page-view page-panel" id="flowsPage" data-page-view="flows">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">automação</p>
+              <h2>Fluxos</h2>
+              <p>Construa automações de atendimento com gatilhos e ações.</p>
+            </div>
+            <div class="page-heading-actions">
+              <button class="text-action" type="button" id="manageGlobalVarsBtn">🔧 Variáveis Globais</button>
+              <button class="text-action text-action--primary" type="button" id="newFlowBtn">+ Novo Fluxo</button>
+            </div>
+          </header>
+          <div class="flows-list" id="flowsList"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: CONTATOS ===== -->
+      <section class="page-view page-panel" id="contactsPage" data-page-view="contacts">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">base de relacionamento</p>
+              <h2>Contatos</h2>
+              <p>Organize os contatos do seu WhatsApp ou importe uma lista em CSV.</p>
+            </div>
+          </header>
+          <div class="table-toolbar">
+            <div id="contactsChannelSelect"></div>
+            <label class="table-search" for="contactsPageSearch"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input id="contactsPageSearch" type="search" aria-label="Buscar contato por nome ou telefone" placeholder="Busque por nome ou telefone" /></label>
+            <label class="table-select"><span>Rótulo</span><select id="contactsTagFilter"><option value="">Todas as tags</option></select></label>
+            <label class="table-select"><span>Ordenar por</span><select id="contactsPageSort"><option value="name">Nome (A–Z)</option><option value="recent">Atividade mais recente</option></select></label>
+          </div>
+          <div class="table-summary">
+            <p id="contactsPageCount">0 contatos encontrados</p>
+            <div class="contacts-actions">
+              <button type="button" class="secondary-button" id="importContactsBtn" aria-controls="importContactsPanel" aria-expanded="false">Importar contatos</button>
+              <button type="button" class="secondary-button" id="exportContactsBtn">Exportar contatos</button>
+            </div>
+          </div>
+          <section class="inline-editor" id="importContactsPanel" hidden aria-labelledby="importContactsTitle">
+            <div class="editor-panel">
+              <div class="editor-head"><div><h2 id="importContactsTitle">Importar contatos</h2><p class="editor-description">Os contatos serão salvos no chip principal, mesmo se o WhatsApp estiver desconectado.</p></div></div>
+              <form id="importContactsForm" class="profile-form">
+                <p class="import-help" id="importContactsHelp">Escolha um CSV UTF-8 de até 2 MB e 5.000 linhas, separado por ponto e vírgula ou vírgula. Use a coluna <strong>Telefone</strong> com DDI + DDD + número. <strong>Nome</strong> e <strong>Rótulos</strong> são opcionais. O CSV exportado pelo painel também é aceito.</p>
+                <p class="import-help">Telefones repetidos serão agrupados. Contatos existentes terão o nome atualizado quando preenchido, e os rótulos serão somados aos atuais. Linhas inválidas serão listadas no resultado.</p>
+                <button type="button" class="text-action" id="downloadContactsTemplate">Baixar modelo CSV</button>
+                <div class="profile-field"><label for="importContactsFile">Arquivo CSV</label><input type="file" id="importContactsFile" accept=".csv,text/csv" aria-describedby="importContactsHelp" required></div>
+                <p class="profile-error" id="importContactsError" role="alert" hidden></p>
+                <div class="confirm-actions"><button type="button" class="confirm-cancel" id="cancelContactsImport">Fechar</button><button type="submit" class="profile-save" id="submitContactsImport">Importar arquivo</button></div>
+              </form>
+              <div class="import-result" id="importContactsResult" role="status" aria-live="polite" tabindex="-1" hidden></div>
+            </div>
+          </section>
+          <div id="contactsTable"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: WEBHOOKS ===== -->
+      <section class="page-view page-panel" id="webhooksPage" data-page-view="webhooks">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">integração</p>
+              <h2>Webhooks</h2>
+              <p>Receba notificações automáticas em sistemas externos.</p>
+            </div>
+            <button class="text-action text-action--primary" type="button" id="newWebhookBtn">+ Novo Webhook</button>
+          </header>
+          <label class="page-search" for="webhookSearch" style="margin-bottom:20px;display:flex;max-width:320px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="webhookSearch" type="search" placeholder="Buscar webhook…" />
+          </label>
+          <div class="webhooks-list" id="webhooksList"></div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE: CONFIGURAÇÕES ===== -->
+      <section class="page-view page-panel" id="departmentsPage" data-page-view="departments">
+        <div class="page-panel-inner">
+          <header class="page-heading"><div><p class="eyebrow">organização do atendimento</p><h2>Departamentos</h2><p>Organize conversas por área e associe cada número de WhatsApp ao departamento responsável.</p></div><button class="text-action text-action--primary" type="button" id="addDeptBtn">+ Novo departamento</button></header>
+          <div id="departmentsPageHost"></div>
+        </div>
+      </section>
+      <section class="page-view page-panel" id="tagsPage" data-page-view="tags">
+        <div class="page-panel-inner">
+          <header class="page-heading"><div><p class="eyebrow">organização de contatos</p><h2>Tags e rótulos</h2><p>Crie rótulos com cores para organizar contatos e conversas.</p></div><button class="text-action text-action--primary" type="button" id="addTagBtn">+ Nova tag</button></header>
+          <div id="tagsPageHost"></div>
+        </div>
+      </section>
+      <section class="page-view page-panel" id="chipsPage" data-page-view="chips">
+        <div class="page-panel-inner">
+          <header class="page-heading"><div><p class="eyebrow">conexão com o WhatsApp</p><h2>Meus chips</h2><p>Conecte seu WhatsApp pelo QR Code e organize os canais por departamento.</p></div></header>
+          <div id="chipsPageHost"></div>
+        </div>
+      </section>
+      <section class="page-view page-panel" id="settingsPage" data-page-view="settings">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">minha conta</p>
+              <h2>Meu perfil</h2>
+              <p>Atualize seus dados de acesso, o nome nas mensagens e sua senha.</p>
+            </div>
+          </header>
+          <div class="profile-settings-card" aria-labelledby="profileSettingsTitle">
+            <h3 id="profileSettingsTitle">Dados da conta</h3>
+            <p class="profile-settings-description">Confirme sua senha atual para salvar as alterações.</p>
+            <p id="profileLoading" role="status" hidden>Carregando seu perfil…</p>
+            <form id="profileForm" class="profile-form">
+        <div class="profile-field">
+          <label for="profileUsername">Usuário (ID de login)</label>
+          <input id="profileUsername" name="username" type="text" minlength="3" maxlength="40" pattern="[A-Za-z0-9_.-]+" autocapitalize="none" spellcheck="false" autocomplete="username" required />
+        </div>
+        <div class="profile-field">
+          <label for="profileDisplayName">Nome exibido nas mensagens</label>
+          <input id="profileDisplayName" name="displayName" type="text" maxlength="60" autocomplete="name" required />
+        </div>
+        <div class="profile-field">
+          <label for="profileCurrentPassword">Senha atual <span class="required-mark">*</span></label>
+          <input id="profileCurrentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="profile-divider">alterar senha <span>opcional</span></div>
+        <div class="profile-field">
+          <label for="profileNewPassword">Nova senha</label>
+          <input id="profileNewPassword" name="newPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" />
+        </div>
+        <div class="profile-field">
+          <label for="profileConfirmPassword">Confirmar nova senha</label>
+          <input id="profileConfirmPassword" name="confirmPassword" type="password" minlength="6" autocomplete="new-password" />
+        </div>
+        <p class="profile-error" id="profileError" role="alert" hidden></p>
+        <button class="profile-save" type="submit" id="profileSaveBtn">Salvar alterações</button>
+      </form>
+          </div><div id="accountSettingsSlot"></div>
+        </div>
+      </section>
+      <template id="managementResourceTemplates">
+        <div class="settings-group" id="chipsGroup"><div id="chipsList" class="chips-list"></div></div>
+<div class="settings-group" id="tagsGroup">
+            
+            <div class="settings-card settings-card--borderless">
+              <div class="settings-card-body" style="width:100%">
+                
+                <div id="tagsSettingsList" class="tags-settings-list"></div>
+              </div>
+            </div>
+          </div>
+<div class="settings-group" id="departmentsGroup">
+            
+            <div class="settings-card settings-card--borderless">
+              <div class="settings-card-body" style="width:100%">
+                
+                <div id="deptsSettingsList" class="tags-settings-list"></div>
+              </div>
+            </div>
+          </div>
+      </template>
+
+      <!-- ===== PAGE: MINHA EQUIPE ===== -->
+      <section class="page-view page-panel" id="teamPage" data-page-view="team">
+        <div class="page-panel-inner">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">organização e acessos</p>
+              <h2>Minha equipe</h2>
+              <p>Organize seus gerentes e atendentes e defina os acessos de cada membro.</p>
+            </div>
+            <div class="page-heading-actions">
+                <button type="button" class="text-action" id="teamLearnMoreBtn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Saiba mais
+                </button>
+              <button class="text-action text-action--primary" type="button" id="newTeamMemberBtn">+ Novo membro</button>
+            </div>
+          </header>
+          <div id="teamTable"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===================== FORMULARIO: PERFIL ===================== -->
+  
+
+  <!-- ===================== FORMULARIO: CONFIRMAÇÃO ===================== -->
+  <div class="inline-editor" id="confirmModal" hidden>
+    <div class="editor-panel editor-panel--sm" role="region" aria-labelledby="confirmTitle">
+      <div class="editor-head">
+        <h2 id="confirmTitle" class="confirm-title">Confirmar ação</h2>
+      </div>
+      <p class="confirm-body" id="confirmBody"></p>
+      <div class="confirm-actions">
+        <button type="button" class="confirm-cancel" id="confirmCancel">Cancelar</button>
+        <button type="button" class="confirm-ok" id="confirmOk">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: TAGS DE CONVERSA ===================== -->
+  <div class="inline-editor" id="tagsModal" hidden>
+    <div class="editor-panel editor-panel--sm" role="region" aria-labelledby="tagsModalTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">organização</p>
+          <h2 id="tagsModalTitle">Gerenciar Tags</h2>
+        </div>
+        <button class="editor-close" id="tagsModalClose" type="button" aria-label="Cancelar">Cancelar</button>
+      </div>
+      <div id="tagsModalContent"></div>
+      <div class="confirm-actions" style="margin-top:16px">
+        <button type="button" class="confirm-cancel" id="tagsModalClose2">Fechar</button>
+        <button type="button" class="profile-save" id="tagsModalSave">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: CAMPANHA ===================== -->
+  <div class="inline-editor" id="campaignModal" hidden>
+    <div class="editor-panel" role="region" aria-labelledby="campaignModalTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">marketing</p>
+          <h2 id="campaignModalTitle">Nova Campanha</h2>
+        </div>
+        <button class="editor-close" id="campaignModalClose" type="button" aria-label="Cancelar">Cancelar</button>
+      </div>
+      <form id="campaignForm" class="profile-form">
+        <div class="profile-field">
+          <label for="campaignName">Nome da campanha</label>
+          <input id="campaignName" type="text" placeholder="Ex.: Promoção de Setembro" required />
+        </div>
+        <div class="profile-field">
+          <label for="campaignMessage">Mensagem</label>
+          <textarea id="campaignMessage" rows="4" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);padding:10px 12px;font:13px var(--font-ui);resize:vertical;outline:none" placeholder="Texto da mensagem. Use {nome} para personalizar." required></textarea>
+        </div>
+        <div class="profile-field">
+          <label>Tags de envio (contatos com essas tags recebem)</label>
+          <div id="campaignTargetTagsPicker" class="tags-picker"></div>
+        </div>
+        <div class="profile-field">
+          <label>Tags de bloqueio (contatos com essas tags NÃO recebem)</label>
+          <div id="campaignBlockedTagsPicker" class="tags-picker tags-picker--danger"></div>
+        </div>
+        <div class="profile-field">
+          <label for="campaignScheduledAt">Agendar para (opcional)</label>
+          <input id="campaignScheduledAt" type="datetime-local" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);padding:10px 12px;font:13px var(--font-ui);outline:none" />
+        </div>
+        <p class="profile-error" id="campaignError" hidden></p>
+        <button class="profile-save" type="submit" id="campaignSaveBtn">Salvar Campanha</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: WEBHOOK ===================== -->
+  <div class="inline-editor" id="webhookModal" hidden>
+    <div class="editor-panel" role="region" aria-labelledby="webhookModalTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">integração</p>
+          <h2 id="webhookModalTitle">Novo Webhook</h2>
+        </div>
+        <button class="editor-close" id="webhookModalClose" type="button" aria-label="Cancelar">Cancelar</button>
+      </div>
+      <form id="webhookForm" class="profile-form">
+        <div class="profile-field">
+          <label for="webhookName">Nome</label>
+          <input id="webhookName" type="text" placeholder="Ex.: Notificação CRM" required />
+        </div>
+        <div class="profile-field">
+          <label for="webhookUrl">URL do endpoint</label>
+          <input id="webhookUrl" type="url" placeholder="https://meu-sistema.com/webhook" required />
+        </div>
+        <div class="profile-field">
+          <label>Eventos</label>
+          <div class="webhook-events-grid">
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="message.received" /> Nova mensagem recebida</label>
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="conversation.opened" /> Conversa aberta</label>
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="conversation.finalized" /> Conversa finalizada</label>
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="conversation.assumed" /> Conversa assumida</label>
+            <label class="webhook-event-item"><input type="checkbox" name="events" value="contact.created" /> Contato criado</label>
+          </div>
+        </div>
+        <div class="profile-field">
+          <label for="webhookSecret">Secret (opcional, para validação HMAC)</label>
+          <input id="webhookSecret" type="text" placeholder="Chave secreta" />
+        </div>
+        <p class="profile-error" id="webhookError" hidden></p>
+        <button class="profile-save" type="submit" id="webhookSaveBtn">Salvar Webhook</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: OPORTUNIDADE ===================== -->
+  <div class="inline-editor" id="opportunityModal" hidden>
+    <div class="editor-panel editor-panel--sm" role="region" aria-labelledby="opportunityModalTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">funis</p>
+          <h2 id="opportunityModalTitle">Nova Oportunidade</h2>
+        </div>
+        <button class="editor-close" id="opportunityModalClose" type="button" aria-label="Cancelar">Cancelar</button>
+      </div>
+      <form id="opportunityForm" class="profile-form">
+        <input type="hidden" id="opportunityId" />
+        <div class="profile-field"><label for="opportunityColumnId">Etapa do funil</label><select id="opportunityColumnId" required></select></div>
+        <div class="profile-field">
+          <label for="opportunityTitle">Título</label>
+          <input id="opportunityTitle" type="text" placeholder="Ex.: Contrato Empresa X" required />
+        </div>
+        <div class="profile-field">
+          <label for="opportunityContact">Contato (número)</label>
+          <input id="opportunityContact" type="text" placeholder="5511999999999" />
+        </div>
+        <div class="profile-field">
+          <label for="opportunityValue">Valor (R$)</label>
+          <input id="opportunityValue" type="number" min="0" step="0.01" placeholder="0,00" />
+        </div>
+        <p class="profile-error" id="opportunityError" hidden></p>
+        <button class="profile-save" type="submit" id="opportunitySaveBtn">Salvar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: PERDA ===================== -->
+  <div class="inline-editor" id="loseModal" hidden>
+    <div class="editor-panel editor-panel--sm" role="region" aria-labelledby="loseModalTitle">
+      <div class="editor-head">
+        <h2 id="loseModalTitle" class="confirm-title">Marcar como Perdida</h2>
+      </div>
+      <div class="profile-field" style="margin-bottom:16px">
+        <label for="loseReasonSelect">Motivo de perda</label>
+        <select id="loseReasonSelect" style="width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-ui);outline:none">
+          <option value="">Sem motivo específico</option>
+        </select>
+      </div>
+      <div class="confirm-actions">
+        <button type="button" class="confirm-cancel" id="loseModalCancel">Cancelar</button>
+        <button type="button" class="confirm-ok" id="loseModalConfirm">Confirmar Perda</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: MOTIVOS DE PERDA ===================== -->
+  <div class="inline-editor" id="lossReasonsModal" hidden>
+    <div class="editor-panel editor-panel--sm" role="region" aria-labelledby="lossReasonsTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">funis</p>
+          <h2 id="lossReasonsTitle">Motivos de Perda</h2>
+        </div>
+        <button class="editor-close" id="lossReasonsClose" type="button">Concluir</button>
+      </div>
+      <div id="lossReasonsContent" style="margin-bottom:16px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newLossReasonInput" placeholder="Nome do motivo…" style="flex:1;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-ui);outline:none" />
+        <button type="button" class="profile-save" style="margin-top:0;padding:9px 16px" id="addLossReasonBtn">+ Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: FLUXO ===================== -->
+  <div class="inline-editor" id="flowModal" hidden>
+    <div class="editor-panel editor-panel--sm" role="region" aria-labelledby="flowModalTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">automação</p>
+          <h2 id="flowModalTitle">Novo Fluxo</h2>
+        </div>
+        <button class="editor-close" id="flowModalClose" type="button" aria-label="Cancelar">Cancelar</button>
+      </div>
+      <form id="flowForm" class="profile-form">
+        <input type="hidden" id="flowId" />
+        <div class="profile-field">
+          <label for="flowName">Nome do fluxo</label>
+          <input id="flowName" type="text" placeholder="Ex.: Boas-vindas" required />
+        </div>
+        <div class="profile-field">
+          <label for="flowDescription">Descrição (opcional)</label>
+          <input id="flowDescription" type="text" placeholder="Para que serve este fluxo?" />
+        </div>
+        <div class="profile-field">
+          <label for="flowKeywords">Palavras-chave gatilho (separadas por vírgula)</label>
+          <input id="flowKeywords" type="text" placeholder="oi, olá, menu" />
+        </div>
+        <p class="profile-error" id="flowError" hidden></p>
+        <button class="profile-save" type="submit" id="flowSaveBtn">Salvar Fluxo</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: VARIÁVEIS GLOBAIS ===================== -->
+  <div class="inline-editor" id="globalVarsModal" hidden>
+    <div class="editor-panel editor-panel--sm" role="region" aria-labelledby="globalVarsTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">fluxos</p>
+          <h2 id="globalVarsTitle">Variáveis Globais</h2>
+        </div>
+        <button class="editor-close" id="globalVarsClose" type="button">Concluir</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-dim);margin:0 0 16px">Use <code style="background:var(--surface-3);padding:2px 5px;border-radius:4px;font-family:var(--font-mono)">{global:CHAVE}</code> nos fluxos para inserir o valor.</p>
+      <div id="globalVarsList" style="margin-bottom:16px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newGlobalVarKey" placeholder="CHAVE" style="width:120px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-mono);outline:none;text-transform:uppercase" />
+        <input type="text" id="newGlobalVarValue" placeholder="valor" style="flex:1;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-ui);outline:none" />
+        <button type="button" class="profile-save" style="margin-top:0;padding:9px 16px;white-space:nowrap" id="addGlobalVarBtn">+ Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: TRANSFERÊNCIA EM MASSA ===================== -->
+  <div class="inline-editor" id="bulkTransferModal" hidden>
+    <div class="editor-panel editor-panel--sm" role="region" aria-labelledby="bulkTransferTitle">
+      <div class="editor-head">
+        <h2 id="bulkTransferTitle" class="confirm-title">Transferência em Massa</h2>
+      </div>
+      <div class="profile-field" style="margin-bottom:16px">
+        <label for="bulkTransferDeptSelect">Departamento destino</label>
+        <select id="bulkTransferDeptSelect" style="width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);font:13px var(--font-ui);outline:none">
+          <option value="">Selecione um departamento…</option>
+        </select>
+      </div>
+      <div class="confirm-actions">
+        <button type="button" class="confirm-cancel" id="bulkTransferCancel">Cancelar</button>
+        <button type="button" class="profile-save" style="margin:0" id="bulkTransferConfirm">Transferir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== FORMULARIO: GERENCIAR EQUIPE ===================== -->
+  <div class="inline-editor" id="teamMemberModal" hidden>
+    <div class="editor-panel editor-panel--team" role="region" aria-labelledby="teamMemberModalTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">organização e acessos</p>
+          <h2 id="teamMemberModalTitle">Gerenciar equipe</h2>
+          <p class="editor-description">Defina o perfil, as áreas de acesso e os funis disponíveis para este membro.</p>
+        </div>
+        <button class="editor-close" id="teamMemberModalClose" type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <form id="teamMemberForm" class="profile-form team-form">
+        <input type="hidden" id="teamMemberId" />
+        <div class="profile-field">
+          <label for="teamMemberName">Nome</label>
+          <input id="teamMemberName" type="text" placeholder="Nome" maxlength="60" required />
+        </div>
+        <div class="profile-field">
+          <label for="teamMemberEmail">E-mail</label>
+          <input id="teamMemberEmail" type="email" placeholder="E-mail" maxlength="60" required />
+        </div>
+        <div class="profile-field">
+          <label for="teamMemberRole">Perfil de acesso</label>
+          <select id="teamMemberRole" required>
+            <option value="Gerente">Gerente</option>
+            <option value="Atendente">Atendente</option>
+          </select>
+        </div>
+        <div class="profile-field">
+          <span class="team-field-label" id="teamMemberAccessLabel">Áreas do sistema</span>
+          <div id="teamMemberAccessSlot"></div>
+          <small class="field-hint">Selecione quais áreas do sistema esse usuário poderá acessar</small>
+        </div>
+        <div class="profile-field">
+          <span class="team-field-label" id="teamMemberFunnelsLabel">Funis disponíveis</span>
+          <div id="teamMemberFunnelsSlot"></div>
+          <small class="field-hint">Selecione quais funis esse usuário poderá visualizar no Kanban</small>
+        </div>
+        <div class="profile-field">
+          <label for="teamMemberPassword">Senha</label>
+          <input id="teamMemberPassword" type="password" placeholder="Senha" autocomplete="new-password" />
+          <small class="field-hint">O usuário poderá trocar a senha depois de acessar</small>
+        </div>
+        <p class="profile-error" id="teamMemberError" hidden></p>
+        <div class="confirm-actions team-modal-actions">
+          <button type="button" class="confirm-cancel" id="teamMemberCancel">Cancelar</button>
+          <button type="submit" class="profile-save" id="teamMemberSave">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: FOTO DE PERFIL ===================== -->
+  <div class="inline-editor" id="photoViewModal" hidden>
+    <div class="editor-panel editor-panel--photo" role="region" aria-labelledby="photoViewTitle">
+      <div class="editor-head">
+        <div>
+          <p class="eyebrow">contato</p>
+          <h2 id="photoViewTitle">Foto de perfil</h2>
+          <p class="editor-description" id="photoViewSubtitle">—</p>
+        </div>
+        <button class="editor-close" id="photoViewClose" type="button" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="photo-view-content" id="photoViewContent"></div>
+    </div>
+  </div>
+
+  <script src="/config/config.js"></script>
+</body>
+</html>

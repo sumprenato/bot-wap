@@ -1,0 +1,62 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const vm = require('node:vm');
+const { execFileSync } = require('node:child_process');
+const sqlite3 = require('sqlite3');
+
+test('RBAC migration preserves legacy data, owner, IDs and reserved sequences across restart', async () => {
+  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'wap-rbac-migration-'));
+  process.env.STORAGE_DIR = storage; process.env.ADMIN_USERNAME = 'legacy-owner'; process.env.ADMIN_PASSWORD = 'migration-password';
+  delete process.env.DATABASE_URL; delete process.env.DATABASE_PRIVATE_URL;
+  const legacy = new sqlite3.Database(path.join(storage, 'database.sqlite'));
+  const run = (sql, params = []) => new Promise((resolve, reject) => legacy.run(sql, params, (error) => error ? reject(error) : resolve()));
+  const source = fs.readFileSync(path.resolve(__dirname, '../db.js'), 'utf8');
+  const migrations = vm.runInNewContext(source.match(/const SQLITE_MIGRATIONS = (\[[\s\S]*?\n\]);/)[1]);
+  for (const sql of migrations) try { await run(sql); } catch (error) { if (!/duplicate column|already exists/i.test(error.message)) throw error; }
+  const now = '2026-01-01T00:00:00.000Z';
+  await run('INSERT INTO users(id,username,password,display_name,email,role) VALUES (1,?,?,?,?,?)', ['legacy-owner','migration-password','Owner','owner@test.invalid','Proprietário da conta']);
+  await run('INSERT INTO users(id,username,password,display_name,email,role) VALUES (5,?,?,?,?,?)', ['legacy-member','member-password','Member','member@test.invalid','Atendente']);
+  await run("INSERT INTO contacts(number,name,name_source) VALUES ('5511000000000','Cliente salvo','whatsapp')");
+  await run("INSERT INTO conversations(number,name,tags) VALUES ('5511000000000','Cliente antigo','[\"VIP\"]')");
+  await run("INSERT INTO messages(number,from_role,text,at) VALUES ('5511000000000','client','Histórico preservado',?)", [now]);
+  await run('INSERT INTO tags(id,name,color,created_at) VALUES (7,?,?,?)', ['VIP','#00ff00',now]);
+  await run('INSERT INTO tags(id,name,color,created_at) VALUES (22,?,?,?)', ['Reserved','#00ff00',now]);
+  await run('DELETE FROM tags WHERE id = 22');
+  await run('INSERT INTO departments(id,name,created_at) VALUES (9,?,?)', ['Comercial',now]);
+  await run('INSERT INTO chips(id,name,number,user_id,department_id,is_primary,created_at) VALUES (3,?,?,1,9,1,?)', ['Canal','5511000000001',now]);
+  await run('INSERT INTO campaigns(id,name,message,created_at) VALUES (4,?,?,?)', ['Campanha','Mensagem',now]);
+  await new Promise((resolve, reject) => legacy.close((error) => error ? reject(error) : resolve()));
+  const db = require('../db');
+  try {
+    await db.ready;
+    assert.deepEqual(await db.get('SELECT id,owner_id FROM accounts WHERE id = 1'), { id: 1, owner_id: 1 });
+    assert.deepEqual(await db.get('SELECT account_id,role,password FROM users WHERE id = 5'), { account_id: 1, role: 'Atendente', password: 'member-password' });
+    assert.equal((await db.get('SELECT text FROM messages')).text, 'Histórico preservado');
+    assert.equal((await db.get('SELECT name FROM contacts')).name, 'Cliente salvo');
+    assert.equal((await db.get('SELECT tags FROM conversations')).tags, '["VIP"]');
+    assert.equal((await db.get('SELECT account_id FROM campaigns WHERE id = 4')).account_id, 1);
+    assert.equal((await db.get('SELECT department_id FROM chips WHERE id = 3')).department_id, 9);
+    const next = await db.run('INSERT INTO tags(name,color,created_at,account_id) VALUES (?,?,?,1)', ['Next','#000000',now]);
+    assert.ok(next.lastID > 22);
+    await require('../rbac-migration').migrate(db);
+    assert.equal((await db.get('SELECT COUNT(*) AS n FROM users')).n, 2);
+    assert.equal((await db.get('SELECT COUNT(*) AS n FROM permission_grants')).n, 0);
+    await db.run('ALTER TABLE permission_grants DROP COLUMN grant_kind');
+    await db.run('DELETE FROM rbac_migrations WHERE version = 2');
+    await db.run('INSERT INTO users(id,username,password,account_id,role) VALUES (6,?,?,1,?)', ['legacy-manager','manager-password','Gerente']);
+    await db.run('INSERT INTO permission_grants(account_id,user_id,permission,granted_by,allowed) VALUES (1,5,?,1,1)', ['atendimento.responder']);
+    await db.run('INSERT INTO permission_grants(account_id,user_id,permission,granted_by,allowed) VALUES (1,5,?,6,1)', ['contatos.visualizar']);
+    await require('../rbac-migration').migrate(db);
+    const grants = await db.all('SELECT permission,granted_by,grant_kind,allowed FROM permission_grants ORDER BY granted_by');
+    assert.deepEqual(grants, [{ permission: 'atendimento.responder', granted_by: 1, grant_kind: 'owner', allowed: 1 }, { permission: 'contatos.visualizar', granted_by: 6, grant_kind: 'manager', allowed: 1 }]);
+    await require('../rbac-migration').migrate(db);
+    assert.deepEqual(await db.all('SELECT permission,granted_by,grant_kind,allowed FROM permission_grants ORDER BY granted_by'), grants);
+    assert.ok(await db.get('SELECT version FROM rbac_migrations WHERE version = 2'));
+    await db.close();
+    const restarted = execFileSync(process.execPath, ['-e', "const d=require('./db');d.ready.then(async()=>{const a=await d.get('SELECT owner_id FROM accounts WHERE id=1');if(a.owner_id!==1)throw Error('Owner changed');await d.close();console.log('RESTART_OK')}).catch(e=>{console.error(e);process.exitCode=1})"], { cwd: path.resolve(__dirname, '..'), env: process.env, encoding: 'utf8' });
+    assert.match(restarted, /RESTART_OK/);
+  } finally { fs.rmSync(storage, { recursive: true, force: true }); }
+});

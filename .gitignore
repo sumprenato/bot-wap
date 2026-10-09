@@ -1,0 +1,29 @@
+node_modules/
+.env
+auth_info/*
+!auth_info/.gitkeep
+media/*
+!media/.gitkeep
+storage/
+session-state.json
+conversations.json
+database.sqlite
+.DS_Store
+npm-debug.log*
+
+.tmp/
+
+# Dados locais e credenciais de cada conta/canal
+chips/
+users/
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+
+# Configuracao e caches locais do ambiente
+.vscode/
+Microsoft/

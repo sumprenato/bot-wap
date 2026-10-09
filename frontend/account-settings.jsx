@@ -1,0 +1,7 @@
+import React, { useEffect, useState } from 'react';
+import { api } from './api';
+export function AccountSettings({ ctx }) {
+  const [name, setName] = useState(''), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  useEffect(() => { let active = true; api('/api/account-settings').then((result) => { if (active) setName(result.name); }).catch((error) => { if (active) setError(error.message); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
+  return <div className="profile-settings-card"><h3>Configurações da equipe</h3><p className="profile-settings-description">Nome compartilhado da conta.</p><form className="profile-form" onSubmit={async (event) => { event.preventDefault(); setBusy(true); setError(''); try { await api('/api/account-settings', 'PUT', { name }); ctx.notify('Configurações salvas.', 'success'); } catch (error) { setError(error.message); } finally { setBusy(false); } }}><div className="profile-field"><label htmlFor="accountName">Nome da conta</label><input id="accountName" value={name} onChange={(event) => setName(event.target.value)} maxLength={60} required disabled={loading || !ctx.can('configuracoes.editar')} /></div><p className="profile-error" role="alert" hidden={!error}>{error}</p>{ctx.can('configuracoes.editar') && <button type="submit" className="profile-save" disabled={loading || busy}>Salvar nome da conta</button>}</form></div>;
+}

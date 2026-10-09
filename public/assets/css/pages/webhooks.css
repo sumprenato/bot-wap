@@ -1,0 +1,64 @@
+
+
+/* =====================================================
+   WEBHOOKS
+   ===================================================== */
+.webhook-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 10px;
+  transition: border-color var(--ease);
+}
+.webhook-card:hover { border-color: var(--border); }
+
+.webhook-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.webhook-status {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.webhook-url {
+  font: 12px var(--font-mono);
+  color: var(--admin);
+  margin: 0 0 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webhook-events-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.webhook-event-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color var(--ease);
+}
+.webhook-event-item:hover { color: var(--text); }
+
+/* =====================================================
+   RESPONSIVE — NEW PAGES
+   ===================================================== */
+@media (max-width: 900px) {
+  .webhook-events-grid { grid-template-columns: 1fr; }}

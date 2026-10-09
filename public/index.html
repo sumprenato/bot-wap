@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Bot WAP</title>
+  <meta name="description" content="Acesse o painel de atendimento do Bot WAP e gerencie suas conversas no WhatsApp em tempo real.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/login.css?v=20261007-5">
+  <link rel="stylesheet" href="/assets/css/motion.css?v=20261007-4">
+  <script defer src="/assets/js/site.js?v=20261007-4"></script>
+</head>
+<body>
+  <main class="auth-layout">
+  <section class="login-intro" aria-label="Bot WAP">
+    <div class="login-wordmark"><span class="login-symbol" aria-hidden="true">w.</span> Bot WAP <span class="wordmark-note">espaço de conversas</span></div>
+    <p class="intro-kicker">conexões começam com uma conversa</p>
+    <h2>Mais perto.<br> Mais <span>possibilidades.</span></h2>
+    <p class="intro-description">Um espaço para ouvir, organizar e dar continuidade a cada conversa.</p>
+    <svg class="login-art" viewBox="0 0 460 260" fill="none" aria-hidden="true">
+      <path d="M28 190h397M370 25v210" stroke="#3c4960" stroke-dasharray="3 6"/>
+      <rect x="47" y="57" width="175" height="151" rx="30" fill="#f4a58a" transform="rotate(-8 47 57)"/>
+      <path d="m91 109 10 34 16-34 16 34 10-34" stroke="#302322" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="m78 180-4 42 49-35" fill="#f4a58a"/>
+      <rect x="203" y="77" width="163" height="114" rx="24" fill="#b9a6ed" transform="rotate(7 203 77)"/>
+      <path d="m322 198 21 32-3-39" fill="#b9a6ed"/>
+      <circle cx="240" cy="139" r="6" fill="#403356"/><circle cx="268" cy="142" r="6" fill="#403356"/><circle cx="296" cy="145" r="6" fill="#403356"/>
+      <circle cx="352" cy="56" r="27" stroke="#87cfbc"/><path d="m352 37 5 14 14 5-14 5-5 14-5-14-14-5 14-5Z" fill="#87cfbc"/>
+      <path d="M124 36C180-9 306 5 345 81" stroke="#98a6bc"/>
+      <circle cx="124" cy="36" r="4" fill="#f5f0e8"/>
+    </svg>
+    <div class="intro-caption"><span>Conversas</span><span>Organização</span><span>Relacionamentos</span></div>
+  </section>
+  <div class="login-card">
+    <div class="login-brand">
+      <span class="login-brand-mark"></span>
+      <span>BOT <b>WAP</b></span>
+    </div>
+    <div class="login-header">
+      <p class="login-kicker">central de atendimento</p>
+      <h1 id="authTitle">Seu espaço.<br><em>Sua conexão.</em></h1>
+      <p id="authDescription">Entre para acompanhar suas conversas e cuidar de cada atendimento.</p>
+    </div>
+
+    <div class="auth-tabs" role="tablist" aria-label="Acesso ao painel">
+      <button type="button" class="auth-tab is-active" id="loginTab" role="tab" aria-selected="true">Entrar</button>
+      <button type="button" class="auth-tab" id="registerTab" role="tab" aria-selected="false">Criar acesso</button>
+    </div>
+    
+    <form id="loginForm" novalidate>
+      <div class="input-group">
+        <label for="username">Usuário</label>
+        <input type="text" id="username" placeholder="ID para entrar no painel" minlength="3" maxlength="40" pattern="[A-Za-z0-9_.-]+" autocapitalize="none" spellcheck="false" required autocomplete="username">
+      </div>
+
+      <div class="input-group register-fields" id="displayNameField" hidden>
+        <label for="displayName">Nome no painel</label>
+        <input type="text" id="displayName" placeholder="Nome que aparecerá nas mensagens" maxlength="60" autocomplete="name">
+      </div>
+
+      <div class="input-group register-fields" id="whatsappNumberField" hidden style="display:none">
+        <label for="whatsappNumber">Número do WhatsApp (opcional — configure depois em Configurações)</label>
+        <input type="tel" id="whatsappNumber" placeholder="+55 (11) 99999-9999" inputmode="tel" maxlength="19" autocomplete="tel">
+      </div>
+      
+      <div class="input-group">
+        <label for="password">Senha</label>
+        <div class="password-field">
+          <input type="password" id="password" placeholder="Sua senha" required autocomplete="current-password">
+          <button type="button" id="togglePassword" aria-label="Mostrar senha">mostrar</button>
+        </div>
+      </div>
+      
+      <div class="register-fields" id="registerFields" hidden>
+        <div class="input-group">
+          <label for="confirmPassword">Confirmar senha</label>
+          <input type="password" id="confirmPassword" placeholder="Repita sua senha" autocomplete="new-password">
+        </div>
+      </div>
+
+      <button type="submit" class="login-btn" id="authSubmit">Entrar no Painel</button>
+      <p id="errorMsg" class="error-msg" hidden></p>
+    </form>
+    <p class="login-footnote"><span></span> ambiente protegido e privado</p>
+  </div>
+
+  </main>
+  <script src="/config/config.js"></script>
+  <script src="assets/js/storage.js"></script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+/* Conversation workspace: compact contact header, actions menu and composer. */
+#inboxPage { padding: 12px; background: var(--bg); min-width: 0; }
+#inboxPage .chat-header { position: relative; z-index: 3; padding: 12px 16px; gap: 12px; flex-wrap: nowrap; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); box-shadow: var(--card-shadow); }
+#inboxPage .chat-header-info { gap: 12px; min-width: 0; }
+#inboxPage .chat-avatar-wrap { width: 52px; height: 52px; padding: 0; border: 0; background: var(--admin-dim); border-radius: 50%; color: var(--admin); cursor: pointer; }
+#inboxPage .chat-avatar { width: 100%; height: 100%; border-radius: inherit; color: var(--admin); background: var(--admin-dim); }
+#inboxPage .chat-contact-copy { flex: 1; min-width: 0; }
+#inboxPage .chat-contact-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 10px; }
+#inboxPage .chat-header h2 { margin: 0; font: 600 17px/1.4 var(--font-ui); letter-spacing: -.3px; overflow-wrap: anywhere; }
+#inboxPage #chatStatus { color: var(--text-dim); font-size: 11px; }
+#inboxPage .chat-sub { margin: 4px 0 0; color: var(--text-faint); font: 12px/1.5 var(--font-ui); }
+.chat-department-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 20px; background: var(--surface-2); color: var(--text-dim); font: 11px var(--font-ui); }
+#inboxPage .chat-actions { flex: 0 0 38px; width: 38px; max-width: 38px; margin: 0; }
+#inboxPage .chat-more-btn { width: 38px; height: 38px; padding: 8px; border: 0; border-radius: 50%; background: transparent; color: var(--text-faint); }
+#inboxPage .chat-more-btn:hover, #inboxPage .chat-more-details[open] .chat-more-btn { background: var(--surface-2); color: var(--text); }
+#inboxPage .chat-more-menu { width: min(280px, calc(100vw - 54px)); padding: 8px; max-height: min(560px, 65dvh); overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: 0 10px 36px #0003; }
+#inboxPage .chat-more-action { min-height: 43px; padding: 10px; gap: 12px; font: 13px var(--font-ui); }
+#inboxPage .chat-more-action > svg { flex-shrink: 0; color: var(--live); }
+#inboxPage .chat-more-action.is-danger > svg { color: var(--danger); }
+#inboxPage .chat-more-action:focus-visible { outline: 2px solid var(--admin); outline-offset: -2px; background: var(--admin-dim); }
+.chat-contact-details { display: grid; gap: 5px; padding: 10px 12px 14px; margin-bottom: 6px; border-bottom: 1px solid var(--border-subtle); font-size: 12px; overflow-wrap: anywhere; }
+#inboxPage .active-tags-row { border: 0; background: transparent; padding: 9px 12px 0; }
+#inboxPage .chat-log { padding: 16px 12px; background: transparent; gap: 10px; }
+#inboxPage .react-messages { gap: 10px; padding-bottom: 6px; }
+#inboxPage .message-bubble { width: fit-content; max-width: min(430px, 85%); padding: 9px 12px 6px; border-radius: 13px; font: 13px/1.55 var(--font-ui); white-space: normal; }
+#inboxPage .message-bubble.client { align-self: flex-start; background: var(--surface); border: 1px solid var(--border-subtle); }
+#inboxPage .message-bubble.admin { align-self: flex-end; background: color-mix(in srgb, var(--live) 16%, var(--surface)); border: 1px solid color-mix(in srgb, var(--live) 32%, var(--border-subtle)); }
+#inboxPage .bubble-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+#inboxPage .bubble .time { margin-top: 3px; color: var(--text-faint); font: 9px/1.5 var(--font-ui); text-align: right; }
+#inboxPage .bubble img, #inboxPage .bubble video { width: min(380px, 100%); max-height: 380px; object-fit: contain; border-radius: 9px; }
+#inboxPage .bubble img.is-expanded { width: 100%; max-height: none; }
+#inboxPage .file-preview { flex-wrap: wrap; }
+#inboxPage .attachment-audio-preview { flex-basis: 100%; }
+#inboxPage .bubble img + .bubble-text, #inboxPage .bubble video + .bubble-text { margin-top: 7px; }
+#inboxPage .bubble.has-audio { width: min(370px, 85%); }
+#inboxPage .bubble .react-audio-player { min-width: 0; max-width: none; padding: 0; }
+#inboxPage .audio-row { padding: 7px 8px; border-radius: 28px; background: var(--surface-2); gap: 7px; }
+#inboxPage .audio-play-btn { width: 30px; height: 30px; background: transparent; color: var(--text); }
+#inboxPage .audio-time { color: var(--text-dim); font: 11px var(--font-ui); white-space: nowrap; }
+#inboxPage .audio-progress-wrap { display: flex; align-items: center; min-width: 24px; height: auto; }
+#inboxPage .audio-seekbar { position: static; width: 100%; height: 4px; margin: 0; opacity: 1; accent-color: var(--text-dim); cursor: pointer; }
+#inboxPage .audio-volume-btn, #inboxPage .audio-more summary { display: grid; place-items: center; width: 28px; height: 30px; padding: 3px; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; list-style: none; flex-shrink: 0; }
+#inboxPage .audio-more summary::-webkit-details-marker { display: none; }
+#inboxPage .audio-more { position: relative; }
+#inboxPage .audio-options { position: absolute; right: 0; bottom: calc(100% + 8px); display: flex; flex-direction: column; align-items: stretch; padding: 12px; width: 170px; margin: 0; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--surface); box-shadow: var(--card-shadow); z-index: 2; }
+#inboxPage .audio-options select { appearance: auto; }
+#inboxPage .composer { margin-top: 0; padding: 12px; gap: 10px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); box-shadow: var(--card-shadow); align-items: center; }
+#inboxPage .composer-attach { display: flex; flex-direction: row; align-items: center; gap: 2px; }
+#inboxPage .attach-btn { display: grid; place-items: center; width: 32px; height: 40px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--text-faint); }
+#inboxPage .attach-btn:hover { color: var(--admin); background: var(--admin-dim); }
+#inboxPage .composer-input-wrap { min-width: 0; }
+#inboxPage #composerInput { display: block; width: 100%; min-height: 46px; max-height: 120px; padding: 12px; border-radius: 11px; background: var(--bg); font: 13px/1.5 var(--font-ui); resize: vertical; }
+#inboxPage .send-btn { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; background: var(--live); color: var(--bg); box-shadow: 0 3px 9px color-mix(in srgb, var(--live) 20%, transparent); }
+#inboxPage .send-btn svg { width: 19px; height: 19px; }
+.voice-recorder { position: relative; }
+.voice-recording-status { position: absolute; bottom: calc(100% + 15px); left: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 12px; box-shadow: var(--card-shadow); z-index: 5; white-space: nowrap; }
+.voice-recording-status button { border: 0; background: transparent; color: var(--danger); font: inherit; cursor: pointer; }
+.recording-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+#inboxPage .attach-btn.is-recording { color: var(--danger); background: var(--danger-dim); }
+#inboxPage .attachment-audio-preview { width: 100%; max-width: 320px; height: 36px; margin-bottom: 6px; }
+@media (max-width: 720px) {
+  #inboxPage { padding: 8px; }
+  #inboxPage .chat-header { padding: 12px; gap: 8px; align-items: flex-start; }
+  #inboxPage .chat-header-info { gap: 9px; }
+  #inboxPage .chat-avatar-wrap { width: 42px; height: 42px; }
+  #inboxPage .chat-header h2 { font-size: 15px; }
+  #inboxPage #chatStatus { font-size: 10px; }
+  #inboxPage .chat-log { padding: 14px 4px; }
+  #inboxPage .message-bubble { max-width: 94%; }
+  #inboxPage .bubble.has-audio { width: 94%; max-width: 94%; }
+  #inboxPage .composer { padding: 8px; gap: 6px; flex-wrap: wrap; }
+  #inboxPage .composer-attach { order: 2; }
+  #inboxPage .composer-input-wrap { flex: 1 1 100%; order: 1; }
+  #inboxPage .send-btn { order: 3; margin-left: auto; width: 38px; height: 38px; }
+}
+
+.inbox-channel-field { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--text-dim); }
+.inbox-channel-field select { width: 100%; min-height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); background: var(--surface); font: 12px var(--font-ui); }
+#inboxPage .message-bubble { position: relative; padding-right: 32px; }
+.message-menu-trigger { position: absolute; top: 3px; right: 4px; border: 0; border-radius: 5px; width: 24px; height: 24px; background: transparent; color: var(--text-dim); cursor: pointer; opacity: 0; }
+.message-bubble:hover .message-menu-trigger, .message-bubble:focus-within .message-menu-trigger { opacity: 1; }
+.message-actions-menu { position: fixed; inset: auto; margin: 0; min-width: 184px; padding: 6px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: 0 10px 32px #0003; }
+.message-actions-menu button { display: block; width: 100%; padding: 10px 14px; border: 0; border-radius: 7px; background: transparent; text-align: left; color: inherit; cursor: pointer; }
+.message-actions-menu button:hover, .message-actions-menu button:focus-visible { background: var(--surface-2); }
+.message-actions-menu button:disabled { opacity: .45; cursor: default; }
+.message-actions-menu .is-danger { color: var(--danger, #e66767); }
+.message-selection-toolbar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 12px; font-size: 12px; }
+.message-selection-toolbar button { border: 1px solid var(--border-subtle); border-radius: 7px; padding: 6px 9px; color: var(--text); background: var(--surface-2); cursor: pointer; }
+.message-bubble.is-selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+.message-selection-check { margin: 0 8px 6px 0; accent-color: var(--accent); }
+.message-quote, .message-reply-preview { display: flex; flex-direction: column; gap: 4px; border: 0; border-left: 3px solid var(--accent); border-radius: 6px; background: var(--surface-2); color: var(--text); padding: 8px 10px; margin: 3px 0 8px; max-width: 100%; text-align: left; }
+.message-quote { cursor: pointer; width: 100%; font: inherit; }
+.message-quote strong, .message-reply-preview strong { color: var(--accent); font-size: 12px; }
+.message-quote span, .message-reply-preview p { margin: 0; font-size: 12px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.message-reply-preview { flex-direction: row; align-items: center; justify-content: space-between; }
+.message-reply-preview > div { min-width: 0; }
+.message-reply-preview button { background: transparent; border: 0; color: var(--text-dim); padding: 6px; cursor: pointer; font-size: 18px; }
+.message-forwarded-label { display: block; font-size: 11px; font-style: italic; color: var(--text-dim); margin-bottom: 5px; }
+.message-operation-dialog { width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--border-subtle); border-radius: 16px; color: var(--text); background: var(--surface); }
+.message-operation-dialog::backdrop { background: #0008; }
+.message-operation-dialog h2 { margin: 0 0 18px; font-size: 20px; }
+.message-operation-dialog p { font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+.message-operation-dialog label { font-size: 13px; }
+.message-operation-dialog input:not([type=checkbox]) { width: 100%; margin: 8px 0; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg); color: var(--text); }
+.message-delete-everyone { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
+@media (max-width: 640px) { .message-menu-trigger { opacity: 1; } }

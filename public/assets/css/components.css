@@ -1,0 +1,11 @@
+.chip-card, .campaign-card, .flow-card, .webhook-card {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+}
+
+.chip-card.chip-online, .flow-card--active {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--live) 40%, var(--border-subtle));
+}
