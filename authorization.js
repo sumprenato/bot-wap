@@ -75,7 +75,7 @@ async function validateResources(req, path = req.path) {
     const numbers = [...(Array.isArray(body.numbers) ? body.numbers : []), ...[body.number, pathNumber, path.endsWith('/messages/forward') ? body.targetNumber : null, profileNumber !== 'me' ? profileNumber : null].filter(Boolean)];
     if (chip && !access.owner && !numbers.length && !rbac.departmentAllowed(access, chip.department_id)) rbac.fail();
     if (chip && !access.owner) for (const number of numbers) {
-      let conversation = await req.botRequest(chip, 'get-conversation', { number });
+      let conversation = await req.botRequest(chip, 'get-conversation', { number, metadataOnly: true });
       if (!conversation && path.startsWith('/contacts/') && ['department', 'account'].includes(access.scope) && rbac.departmentAllowed(access, chip.department_id)) conversation = { departmentId: chip.department_id };
       const scopedAccess = path.startsWith('/contacts/') || path.startsWith('/whatsapp/profile/') ? { ...access, permissions: [...access.permissions, 'atendimento.visualizar_todos'] } : access;
       if (!rbac.conversationAllowed(scopedAccess, conversation, chip)) rbac.fail('Atendimento fora do seu escopo.');

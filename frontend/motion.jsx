@@ -1,4 +1,52 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+
+const formats = {
+  number: new Intl.NumberFormat('pt-BR'),
+  money: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }),
+  percent: new Intl.NumberFormat('pt-BR'),
+};
+
+// Only the visual span changes per frame; assistive technology gets the final value.
+export function AnimatedNumber({ value, format = 'number' }) {
+  const element = useRef(null), displayed = useRef(0);
+  const target = Number(value) || 0;
+  const formatter = formats[format] || formats.number;
+  const print = amount => formatter.format(amount) + (format === 'percent' ? '%' : '');
+  const label = print(target);
+  useLayoutEffect(() => {
+    const preference = matchMedia('(prefers-reduced-motion: reduce)');
+    const start = displayed.current;
+    let frame, started;
+    const finish = () => {
+      cancelAnimationFrame(frame);
+      displayed.current = target;
+      if (element.current) element.current.textContent = print(target);
+    };
+    const tick = time => {
+      started ??= time;
+      const progress = Math.min(1, (time - started) / 640);
+      const amount = start + (target - start) * (1 - Math.pow(1 - progress, 3));
+      displayed.current = amount;
+      if (element.current) element.current.textContent = print(format === 'number' ? Math.round(amount) : amount);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+      else finish();
+    };
+    if (preference.matches || document.hidden || start === target) finish();
+    else {
+      element.current.textContent = print(format === 'number' ? Math.round(start) : start);
+      frame = requestAnimationFrame(tick);
+    }
+    const onVisibility = () => { if (document.hidden) finish(); };
+    preference.addEventListener('change', finish);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelAnimationFrame(frame);
+      preference.removeEventListener('change', finish);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [target, format]);
+  return <span className="animated-number" aria-label={label}><span ref={element} aria-hidden="true">{label}</span></span>;
+}
 
 const controls =
   'button, a[href], [role="button"], .convo-item, .contact-item, #dashCardOpen, #dashCardFinalized';

@@ -7,11 +7,18 @@ import { AudioPlayer } from "./audio";
 import { Icon } from "./icons";
 import { VoiceRecorder } from "./voice-recorder";
 import { useMessageActions, QuotedMessage } from './message-actions';
+import { mergeConversationMap } from '../conversation-update';
+const messageDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const contactIndexes = new WeakMap();
 
 function name(ctx, number, item = {}) {
-  const contact = ctx.data.contacts.find(
-    (entry) => entry.number === number || entry.aliases?.includes(number),
-  );
+  let index = contactIndexes.get(ctx.data.contacts);
+  if (!index) {
+    index = new Map();
+    for (const contact of ctx.data.contacts) for (const key of [contact.number, ...(contact.aliases || [])]) if (!index.has(key)) index.set(key, contact);
+    contactIndexes.set(ctx.data.contacts, index);
+  }
+  const contact = index.get(number);
   return (
     contact?.name ||
     item.name ||
@@ -33,10 +40,7 @@ function adopt(ctx, result) {
       ...previous,
       state: {
         ...previous.state,
-        conversations: {
-          ...previous.state.conversations,
-          [result.conversation.number]: result.conversation,
-        },
+        conversations: mergeConversationMap(previous.state.conversations, result.conversation),
       },
     }));
 }
@@ -177,6 +181,12 @@ function Messages({ ctx }) {
     nearBottom = useRef(true),
     previous = useRef({ number: null, count: 0 }),
     messages = selected(ctx).messages || [];
+  const channelKey = `${ctx.data.state.chipId}:${ctx.selected}`;
+  const [historyWindow, setWindow] = useState({ key: channelKey, count: 100 });
+  const count = historyWindow.key === channelKey ? historyWindow.count : 100;
+  const visible = messages.slice(-count);
+  const scrollAnchor = useRef(null);
+  useEffect(() => { setWindow({ key: channelKey, count: 100 }); }, [channelKey]);
   const messageActions = useMessageActions(ctx, messages);
   useEffect(() => {
     const log = ref.current?.parentElement;
@@ -191,8 +201,15 @@ function Messages({ ctx }) {
   useLayoutEffect(() => {
     const log = ref.current?.parentElement;
     if (!log) return;
+    if (scrollAnchor.current) {
+      const anchor = scrollAnchor.current;
+      log.scrollTop = anchor.top + log.scrollHeight - anchor.height;
+      scrollAnchor.current = null;
+      return;
+    }
     const switched = previous.current.number !== ctx.selected;
-    if (switched || nearBottom.current)
+    const added = previous.current.count !== messages.length;
+    if (switched || (added && nearBottom.current))
       log.scrollTo({
         top: log.scrollHeight,
         behavior:
@@ -201,7 +218,7 @@ function Messages({ ctx }) {
             : "smooth",
       });
     previous.current = { number: ctx.selected, count: messages.length };
-  }, [ctx.selected, messages]);
+  }, [ctx.selected, messages, count]);
   if (!ctx.selected)
     return (
       <div className="empty-state">
@@ -221,8 +238,14 @@ function Messages({ ctx }) {
       aria-relevant="additions text"
     >
       {messageActions.toolbar}
+      {messages.length > visible.length && <button type="button" className="text-action chat-load-earlier" onClick={() => {
+        const log = ref.current?.parentElement;
+        if (log) scrollAnchor.current = { height: log.scrollHeight, top: log.scrollTop };
+        nearBottom.current = false;
+        setWindow({ key: channelKey, count: count + 100 });
+      }}>Carregar mensagens anteriores ({messages.length - visible.length})</button>}
       {messages.length ? (
-        messages.map((message, index) => (
+        visible.map((message, index) => (
           <div
             className={`bubble message-bubble${messageActions.chosen.includes(message.id) ? ' is-selected' : ''}${message.type === "audio" ? " has-audio" : ""} ${message.from === "admin" ? "admin" : "client"}`}
             key={`${ctx.selected}:${message.id || `${message.at}-${index}`}`}
@@ -230,7 +253,10 @@ function Messages({ ctx }) {
           >
             {messageActions.trigger(message)}
             {message.forwarded && <small className="message-forwarded-label">Encaminhada</small>}
-            {message.replyTo && <QuotedMessage quote={message.replyTo} contactName={name(ctx, ctx.selected, selected(ctx))} messages={messages} />}
+            {message.replyTo && <QuotedMessage quote={message.replyTo} contactName={name(ctx, ctx.selected, selected(ctx))} messages={messages} onReveal={source => {
+              const index = messages.findIndex(message => message.id === source.id);
+              if (index >= 0) { nearBottom.current = false; setWindow({ key: channelKey, count: Math.max(count, messages.length - index) }); }
+            }} />}
             {["image", "gif"].includes(message.type) && message.mediaUrl && (
               <MessageImage message={message} />
             )}
@@ -263,11 +289,7 @@ function Messages({ ctx }) {
             )}
             <span className="time">
               {message.at
-                ? new Date(message.at).toLocaleString("pt-BR", {
-                    day: "2-digit", month: "2-digit", year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
+                ? (Number.isFinite(new Date(message.at).getTime()) ? messageDate.format(new Date(message.at)) : '')
                 : ""}
               {message.from === 'admin' && message.deliveryStatus != null && <span className="message-receipt" style={{ color: message.deliveryStatus >= 4 ? '#53bdeb' : 'inherit', display: 'inline-flex', verticalAlign: 'middle', marginLeft: 4 }} title={message.deliveryStatus >= 4 ? 'Visualizado' : message.deliveryStatus === 3 ? 'Entregue' : message.deliveryStatus === 2 ? 'Enviado' : message.deliveryStatus === 0 ? 'Falha no envio' : 'Enviando'} aria-label={message.deliveryStatus >= 4 ? 'Visualizado' : message.deliveryStatus === 3 ? 'Entregue' : message.deliveryStatus === 2 ? 'Enviado' : message.deliveryStatus === 0 ? 'Falha no envio' : 'Enviando'}><Icon name={message.deliveryStatus >= 3 ? 'doubleCheck' : message.deliveryStatus === 2 ? 'check' : message.deliveryStatus === 0 ? 'block' : 'clock'} size={15} /></span>}
             </span>
@@ -283,6 +305,11 @@ function Messages({ ctx }) {
     </div>
   );
 }
+// Typing in the composer must not redraw the history or the conversation list.
+const MemoMessages = React.memo(Messages, ({ ctx: a }, { ctx: b }) =>
+  a.selected === b.selected && a.data === b.data && a.access === b.access && a.contactsBlocked === b.contactsBlocked && a.preferences === b.preferences);
+const MemoConversationList = React.memo(ConversationList, ({ ctx: a }, { ctx: b }) =>
+  a.selected === b.selected && a.data === b.data && a.access === b.access && a.filter === b.filter && a.bulk === b.bulk && a.bulkMode === b.bulkMode && a.fields.conversationSearch === b.fields.conversationSearch && a.fields.departmentFilter === b.fields.departmentFilter);
 function MessageImage({ message }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -651,7 +678,7 @@ export function inboxSlot(ctx, id, node) {
   const item = selected(ctx),
     all = Object.entries(ctx.data.state.conversations || {}).filter(([, conversation]) => conversation.messages?.length > 0);
   if (["inboxChannelSelect", "contactsChannelSelect"].includes(id)) return <label className="inbox-channel-field"><span>Canal de atendimento</span><select id="inboxChipSelect" aria-label="Canal de atendimento" value={ctx.data.state.chipId || ''} onChange={(event) => ctx.selectChannel(event.target.value)} disabled={!!ctx.busy || !!ctx.files.fileInput || !!ctx.fields.voiceRecording}><option value="" disabled>Selecione um chip</option>{(ctx.data.state.chips || []).map((chip) => <option key={chip.chipId} value={chip.chipId}>{chip.name} · {chip.connected ? 'Conectado' : 'Desconectado'}</option>)}</select></label>;
-  if (id === "convoList") return <ConversationList ctx={ctx} />;
+  if (id === "convoList") return <MemoConversationList ctx={ctx} />;
   if (id === "convoCount") return conversations(ctx).length;
   if (id === "overviewConversations")
     return all.filter(([, entry]) => !entry.blocked && !entry.isFinalized)
@@ -696,7 +723,7 @@ export function inboxSlot(ctx, id, node) {
   if (id === "tagsBtn") return "tags";
   if (id === "clearBtn") return "limpar";
   if (id === "deleteBtn") return "apagar";
-  if (id === "chatLog") return <Messages ctx={ctx} />;
+  if (id === "chatLog") return <MemoMessages ctx={ctx} />;
   if (id === "activeTagsPills") return pills(ctx, item.tags);
   if (id === "chatMoreNumber")
     return ctx.selected

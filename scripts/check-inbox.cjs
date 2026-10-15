@@ -89,7 +89,7 @@ async function main() {
         lastReplyTo = payload.replyTo;
         const source = conversation.messages.find(message => message.id === Number(payload.replyTo));
         conversation.messages.push({ id: conversation.messages.length + 100, whatsappId: `reply-${conversation.messages.length}`, from: 'admin', text: payload.text, at, replyTo: source ? { id: source.id, whatsappId: source.whatsappId, from: source.from, text: source.caption || source.text, type: source.type } : null });
-        return { conversation, activeTarget: number };
+        return { conversation: { ...conversation, partialMessages: true, messages: conversation.messages.slice(-1) }, activeTarget: number };
       }
       if (action === 'reply-media') {
         sentName = payload.displayName;
@@ -146,6 +146,7 @@ async function main() {
           sessionStorage.setItem('bwap-workspace-state', JSON.stringify({ selectedNumber: number }));
         }, { theme, number });
         await page.reload();
+        await page.locator('.convo-item').filter({ hasText: 'Fernanda' }).first().click();
         await page.waitForFunction(() => document.getElementById('chatTitle')?.textContent === 'Fernanda');
         await page.locator('#chatTitle').waitFor({ state: 'visible' });
         await page.locator('.audio-time').first().getByText('0:00 / 0:03').waitFor();
@@ -428,6 +429,7 @@ async function main() {
     const secondChip = await (await context.request.post(base + '/api/chips', { data: { name: 'Segundo teste', departmentId: department.department.id } })).json();
     await page.reload();
     await page.locator('#chatTitle').waitFor();
+    await page.waitForLoadState('networkidle');
     io.emit('chip:status', { chipId: secondChip.chip.id, connected: true, contactsSync: { syncing: true, verified: false, stage: 'loading' } });
     await page.locator('.contacts-sync-overlay').waitFor();
     io.emit('status', { ...state.status, chipId: 1 });
@@ -437,6 +439,35 @@ async function main() {
     await page.locator('.contacts-sync-overlay').waitFor({ state: 'hidden' });
     assert.deepEqual(errors, []);
     console.log('PASS: full-panel loader, keyboard blocking, refresh persistence, text/media rejection, verification, failure recovery and unlock');
+    conversation.messages = Array.from({ length: 5000 }, (_, index) => ({ id: 10000 + index, whatsappId: `large-${index}`, from: index % 2 ? 'admin' : 'client', text: `Histórico extenso ${index}`, at: new Date(Date.now() - (5000 - index) * 1000).toISOString() }));
+    await page.evaluate(number => {
+      const workspace = JSON.parse(sessionStorage.getItem('bwap-workspace-state'));
+      workspace.selectedNumber = number;
+      sessionStorage.setItem('bwap-workspace-state', JSON.stringify(workspace));
+    }, number);
+    await page.reload();
+    await page.getByText('Histórico extenso 4999', { exact: true }).waitFor();
+    assert.equal(await page.locator('.message-bubble').count(), 100, 'large histories render in blocks without deleting records');
+    await page.evaluate(() => {
+      window.historyTypingMutations = 0;
+      new MutationObserver(records => { window.historyTypingMutations += records.length; }).observe(document.querySelector('.react-messages'), { childList: true, characterData: true, subtree: true });
+    });
+    const started = Date.now();
+    await page.locator('#composerInput').pressSequentially('Envio com cinco mil mensagens');
+    const typingMs = Date.now() - started;
+    assert.equal(await page.evaluate(() => window.historyTypingMutations), 0, 'typing must not redraw or reformat message history');
+    io.emit('message', { ...conversation, partialMessages: true, messages: [{ ...conversation.messages[4999], deliveryStatus: 4 }] });
+    await page.locator('[data-message-id="14999"] [aria-label="Visualizado"]').waitFor();
+    assert.equal(await page.locator('.message-bubble').count(), 100);
+    await page.locator('#sendBtn').click();
+    await page.locator('.bubble-text').filter({ hasText: 'Envio com cinco mil mensagens' }).waitFor();
+    assert.equal(conversation.messages.length, 5001);
+    assert.equal(await page.locator('.message-bubble').count(), 100);
+    await page.getByRole('button', { name: /Carregar mensagens anteriores/ }).click();
+    assert.equal(await page.locator('.message-bubble').count(), 200);
+    assert.equal(conversation.messages.length, 5001, 'loading earlier messages never truncates storage');
+    assert.deepEqual(errors, []);
+    console.log(`PASS: 5,000-message history, 100 visible rows, typing without history mutations (${typingMs} ms), partial receipts, sending and earlier-message loading`);
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => io.close(resolve));

@@ -1,14 +1,18 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, cleanNumber } from './api';
+import { mergeConversationMap } from '../conversation-update';
 
 const preview = message => message.caption || message.text || `[${message.type || 'Mensagem'}]`;
-export function QuotedMessage({ quote, contactName, messages }) {
+export function QuotedMessage({ quote, contactName, messages, onReveal }) {
   return <button type="button" className="message-quote" onClick={() => {
     const source = messages.find(message => message.id === quote.id || quote.whatsappId && message.whatsappId === quote.whatsappId);
     if (!source) return;
-    const element = document.querySelector(`[data-message-id="${source.id}"]`);
-    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    element?.focus({ preventScroll: true });
+    onReveal?.(source);
+    requestAnimationFrame(() => {
+      const element = document.querySelector(`[data-message-id="${source.id}"]`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element?.focus({ preventScroll: true });
+    });
   }}><strong>{quote.from === 'admin' ? 'Você' : contactName}</strong><span>{preview(quote)}</span></button>;
 }
 
@@ -31,7 +35,7 @@ function MessageOperation({ ctx, operation, close, complete, messages }) {
           chipId: ctx.data.state.chipId, messageIds: operation.ids,
           ...(forwarding ? { targetNumber: cleanNumber(target) } : { forEveryone: everyone }),
         });
-        if (result.conversation && String(result.conversation.chipId) === String(ctx.current().data.state.chipId)) ctx.setData(previous => ({ ...previous, state: { ...previous.state, conversations: { ...previous.state.conversations, [result.conversation.number]: result.conversation } } }));
+        if (result.conversation && String(result.conversation.chipId) === String(ctx.current().data.state.chipId)) ctx.setData(previous => ({ ...previous, state: { ...previous.state, conversations: mergeConversationMap(previous.state.conversations, result.conversation) } }));
         complete(); close();
       } catch (failure) { setError(failure.message); } finally { setBusy(false); }
     }}>

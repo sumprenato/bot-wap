@@ -998,7 +998,10 @@ async function main() {
     await page.goForward();
     assert.equal(new URL(page.url()).pathname, "/contatos/");
     await context.request.post(base + "/api/logout");
-    await page.reload();
+    // The open socket can redirect to login before reload completes.
+    await page.reload().catch(error => {
+      if (!error.message.includes('net::ERR_ABORTED')) throw error;
+    });
     await page.waitForURL((url) => url.pathname === "/");
     assert.equal(
       new URL(page.url()).searchParams.get("redirect"),

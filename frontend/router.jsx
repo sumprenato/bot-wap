@@ -12,12 +12,14 @@ export function Router({ layout, page }) {
   };
   const [route, setRoute] = useState(initial),
     request = useRef(null),
+    transition = useRef(null),
     saved = useRef(new Map([[initial.url, initial]]));
   const current = useRef(route);
   current.current = route;
   async function navigate(url, { pop = false } = {}) {
     if (!pop && url === location.pathname + location.search) return;
     request.current?.abort();
+    transition.current?.skipTransition();
     const controller = new AbortController();
     request.current = controller;
     try {
@@ -67,9 +69,21 @@ export function Router({ layout, page }) {
         saved.current.set(url, next);
       }
       if (controller.signal.aborted) return;
-      if (!pop) history.pushState({ page: next.page }, "", url);
       // The shell and socket remain mounted. Only the requested page changes.
-      flushSync(() => setRoute(next));
+      const commit = () => {
+        if (controller.signal.aborted) return;
+        if (!pop) history.pushState({ page: next.page }, "", url);
+        flushSync(() => setRoute(next));
+      };
+      if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches && !document.hidden) {
+        const active = document.startViewTransition(commit);
+        transition.current = active;
+        // A skipped snapshot still commits navigation, including rapid clicks.
+        active.finished.catch(() => {}).finally(() => {
+          if (transition.current === active) transition.current = null;
+        });
+        await active.updateCallbackDone;
+      } else commit();
     } catch (error) {
       if (error.name === "AbortError") return;
       window.dispatchEvent(

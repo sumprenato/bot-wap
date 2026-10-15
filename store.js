@@ -2,8 +2,9 @@ const db = require('./db');
 const { serializeMessage, parseMessage, messageIds } = require('./message-data');
 const { accountId, actorId, departmentId } = require('./account-context');
 
-const MAX_MESSAGES_PER_CONVERSATION = 200;
 const MEDIA_LABELS = { image: 'Imagem', gif: 'GIF', video: 'Vídeo', audio: 'Áudio', document: 'Documento' };
+// UI reads must not load the encrypted payload used only for replies/retries.
+const MESSAGE_VIEW_COLUMNS = 'messages.id, messages.number, messages.from_role, messages.text, messages.at, messages.type, messages.media_url, messages.mime_type, messages.file_name, messages.caption, messages.whatsapp_msg_id, messages.message_context, message_receipts.status AS delivery_status';
 
 function cleanNumber(number) {
   return (number || '').toString().replace(/\D/g, '');
@@ -45,7 +46,7 @@ function formatConversation(convo, rows, aliases = []) {
   };
 }
 
-async function getConversation(number, create = true) {
+async function getConversation(number, create = true, { messageId, metadataOnly = false } = {}) {
   number = await resolveConversationNumber(number);
   let convo = await db.get('SELECT * FROM conversations WHERE number = ?', [number]);
   if (!convo) {
@@ -55,14 +56,16 @@ async function getConversation(number, create = true) {
   }
   const blockedContact = await db.get('SELECT number FROM blocked_contacts WHERE number = ?', [number]);
   convo.blocked = !!blockedContact;
-  const rows = await db.all('SELECT messages.*, message_receipts.status AS delivery_status FROM messages LEFT JOIN message_receipts ON messages.whatsapp_msg_id = message_receipts.whatsapp_msg_id WHERE number = ? ORDER BY at ASC, id ASC', [number]);
+  const rows = metadataOnly ? [] : await db.all(`SELECT ${MESSAGE_VIEW_COLUMNS} FROM messages LEFT JOIN message_receipts ON messages.whatsapp_msg_id = message_receipts.whatsapp_msg_id WHERE number = ?${messageId ? ' AND messages.whatsapp_msg_id = ?' : ''} ORDER BY at ASC, id ASC`, messageId ? [number, messageId] : [number]);
   const aliases = await getAliases(number);
   convo.name = '';
   for (const candidate of [number, ...aliases]) {
     const contact = await getContact(candidate);
     if (contact?.name) { convo.name = contact.name; break; }
   }
-  return formatConversation(convo, rows, aliases);
+  const result = formatConversation(convo, rows, aliases);
+  if (messageId) result.partialMessages = true;
+  return result;
 }
 
 async function getAliases(number) {
@@ -184,20 +187,32 @@ async function updateContactVariables(number, variables) {
   return getContact(clean);
 }
 
-async function updateMessageStatus(waMsgId, status) {
+async function updateMessageStatus(waMsgId, status, returnConversation = true) {
   if (!waMsgId || !Number.isInteger(status) || status < 0 || status > 5) return null;
-  await db.run(`INSERT INTO message_receipts (whatsapp_msg_id, status) VALUES (?, ?)
-    ON CONFLICT(whatsapp_msg_id) DO UPDATE SET status = CASE WHEN excluded.status = 0 AND message_receipts.status < 2 THEN 0 WHEN excluded.status > message_receipts.status THEN excluded.status ELSE message_receipts.status END`, [waMsgId, status]);
+  const result = await db.run(`INSERT INTO message_receipts (whatsapp_msg_id, status) VALUES (?, ?)
+    ON CONFLICT(whatsapp_msg_id) DO UPDATE SET status = excluded.status
+    WHERE excluded.status > message_receipts.status OR (excluded.status = 0 AND message_receipts.status < 2 AND message_receipts.status <> 0)`, [waMsgId, status]);
+  if (!returnConversation || !result.changes) return null;
   const message = await db.get("SELECT number FROM messages WHERE whatsapp_msg_id = ? AND from_role = 'admin'", [waMsgId]);
-  return message ? getConversation(message.number) : null;
+  return message ? getConversation(message.number, false, { messageId: waMsgId }) : null;
 }
 
 async function addMessage(number, from, text = '', name = '', media = {}, waMsgId = '', waStatus, details = {}) {
+  // Serialize duplicate checks with insertion: history and a live echo can carry
+  // the same WhatsApp ID concurrently. A failed insert must not leave half a record.
+  const result = await db.transaction(() => insertMessage(number, from, text, name, media, waMsgId, waStatus, { ...details, deferConversation: true }));
+  return details.deferConversation ? result : getConversation(result.number, true, details.delta && waMsgId ? { messageId: waMsgId } : {});
+}
+
+async function insertMessage(number, from, text, name, media, waMsgId, waStatus, details) {
   number = await resolveConversationNumber(number);
   await ensureConversation(number, name);
 
-  const at = new Date().toISOString();
-  if (from === 'admin' && waMsgId && Number.isInteger(waStatus)) await updateMessageStatus(waMsgId, waStatus);
+  const at = details.at ? new Date(details.at).toISOString() : new Date().toISOString();
+  if (waMsgId && await db.get('SELECT id FROM messages WHERE number = ? AND whatsapp_msg_id = ?', [number, waMsgId])) {
+    return details.deferConversation ? { number } : getConversation(number);
+  }
+  if (from === 'admin' && waMsgId && Number.isInteger(waStatus)) await updateMessageStatus(waMsgId, waStatus, false);
   const hasMedia = !!(media && media.type && media.type !== 'text');
 
   await db.run(
@@ -219,24 +234,10 @@ async function addMessage(number, from, text = '', name = '', media = {}, waMsgI
     ]
   );
 
-  // Mantém só as últimas MAX_MESSAGES_PER_CONVERSATION mensagens por conversa
-  const countRow = await db.get('SELECT COUNT(*) as c FROM messages WHERE number = ?', [number]);
-  const count = Number(countRow?.c || 0);
-  if (count > MAX_MESSAGES_PER_CONVERSATION) {
-    const excess = count - MAX_MESSAGES_PER_CONVERSATION;
-    const oldRows = await db.all(
-      'SELECT id FROM messages WHERE number = ? ORDER BY id ASC LIMIT ?',
-      [number, excess]
-    );
-    for (const row of oldRows) {
-      await db.run('DELETE FROM messages WHERE id = ?', [row.id]);
-    }
-  }
-
   const lastMessage = hasMedia ? (media.caption || `[${MEDIA_LABELS[media.type] || 'Anexo'}]`) : text;
   await db.run(
-    'UPDATE conversations SET last_message = ?, last_message_at = ?, last_from = ? WHERE number = ?',
-    [lastMessage, at, from, number]
+    "UPDATE conversations SET last_message = ?, last_message_at = ?, last_from = ? WHERE number = ? AND (last_message_at IS NULL OR last_message_at = '' OR last_message_at <= ?)",
+    [lastMessage, at, from, number, at]
   );
   if (name) {
     const existing = await db.get('SELECT name FROM conversations WHERE number = ?', [number]);
@@ -245,7 +246,7 @@ async function addMessage(number, from, text = '', name = '', media = {}, waMsgI
     }
   }
 
-  return getConversation(number);
+  return details.deferConversation ? { number } : getConversation(number);
 }
 
 async function getStoredMessages(number, ids) {
@@ -455,7 +456,7 @@ async function mergeConversation(duplicate, canonical) {
   await db.run('DELETE FROM conversations WHERE number = ?', [duplicate.number]);
 }
 
-async function getAll() {
+async function getAll({ metadataOnly = false } = {}) {
   const names = new Map((await getContacts()).map((contact) => [contact.number, contact.name]));
   const convos = await db.all('SELECT * FROM conversations WHERE EXISTS (SELECT 1 FROM messages WHERE messages.number = conversations.number)', []);
   const aliasRows = await db.all('SELECT alias, number FROM conversation_aliases', []);
@@ -470,14 +471,21 @@ async function getAll() {
     (aliasesByNumber[canonical] ||= []).push(contact.number);
   }
   const result = {};
+  const blockedContacts = await db.all('SELECT number FROM blocked_contacts', []);
+  const blocked = new Set(blockedContacts.map(contact => contact.number));
+  const messagesByNumber = new Map();
+  const messageRows = metadataOnly ? [] : await db.all(`SELECT ${MESSAGE_VIEW_COLUMNS} FROM messages LEFT JOIN message_receipts ON messages.whatsapp_msg_id = message_receipts.whatsapp_msg_id ORDER BY number ASC, at ASC, id ASC`, []);
+  for (const row of messageRows) {
+    if (!messagesByNumber.has(row.number)) messagesByNumber.set(row.number, []);
+    messagesByNumber.get(row.number).push(row);
+  }
   for (const convo of convos) {
     convo.name = [convo.number, ...(aliasesByNumber[convo.number] || [])].map((number) => names.get(number)).find(Boolean) || '';
-    convo.blocked = await isBlocked(convo.number);
-    const rows = await db.all('SELECT messages.*, message_receipts.status AS delivery_status FROM messages LEFT JOIN message_receipts ON messages.whatsapp_msg_id = message_receipts.whatsapp_msg_id WHERE number = ? ORDER BY at ASC, id ASC', [convo.number]);
+    convo.blocked = blocked.has(convo.number);
+    const rows = messagesByNumber.get(convo.number) || [];
     result[convo.number] = formatConversation(convo, rows, aliasesByNumber[convo.number] || []);
   }
 
-  const blockedContacts = await db.all('SELECT number FROM blocked_contacts', []);
   for (const contact of blockedContacts) {
     if (result[contact.number]) continue;
     result[contact.number] = formatConversation({

@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { Router } from "./router";
-import { LoginCard } from "./login";
+import { LoginCard, LoginThemeSwitch } from "./login";
 import { captureLayout, Template, UI } from "./template";
 import { InteractionEffects } from "./motion";
 
@@ -21,7 +21,7 @@ else {
     replace: (node) =>
       node.props.className?.split(" ").includes("login-card") ? (
         <LoginCard />
-      ) : undefined,
+      ) : node.props.id === 'loginThemeSwitch' ? <LoginThemeSwitch /> : undefined,
     slot: () => undefined,
     actions: {},
     submits: {},

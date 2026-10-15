@@ -71,6 +71,92 @@ acompanhar e responder tudo em tempo real.
 
 ## Rodando localmente
 
+### Estabilidade dos chips e diagnóstico de quedas
+
+Após confirmar a identidade do WhatsApp conectado pelo QR Code, o bot importa
+automaticamente as mensagens dos últimos sete dias entregues pelo WhatsApp no
+evento de histórico. Mensagens recebidas e enviadas ficam no armazenamento
+isolado do chip com suas datas originais, sem duplicar IDs já salvos. Lotes de
+histórico não executam comandos antigos, enviam mensagens ou marcam conversas
+como lidas. O diálogo de conexão mostra a quantidade importada.
+
+As mensagens permanecem salvas após os sete dias e após reiniciar o serviço;
+o limite antigo de 200 mensagens por conversa foi removido. Exclusões manuais
+continuam disponíveis. Na Railway, isso depende de manter o volume persistente.
+O WhatsApp decide quais mensagens e anexos disponibiliza; mídia indisponível
+mantém seu registro e metadados, sem impedir a importação das demais mensagens.
+Não é necessário desconectar uma sessão existente para instalar a mudança.
+Teste isolado: `npm run test:history`.
+
+O atendimento renderiza inicialmente as 100 mensagens mais recentes, com o botão
+"Carregar mensagens anteriores" para consultar o restante. Isso limita o trabalho
+do navegador, sem remover mensagens do banco. Envio e confirmações de entrega usam
+atualizações parciais mescladas pelo ID da mensagem; consultas da interface não
+carregam os dados criptográficos armazenados para reenvios. As consultas de escopo
+continuam aplicando as mesmas permissões e usam apenas metadados.
+
+`npm test` inclui os testes de consultas e atualizações parciais. `npm run test:inbox`
+também verifica uma conversa com 5.000 mensagens, envio, digitação, confirmações e
+acesso ao histórico anterior.
+
+Quedas de rede e erros genéricos de stream (inclusive código 500) preservam as
+credenciais e reconectam com espera crescente, limitada a 30 segundos. A espera
+só volta ao início depois de uma conexão estável por pelo menos um minuto.
+Uma confirmação de identidade indisponível por erro temporário do servidor
+também preserva o dispositivo vinculado; uma conta comprovadamente diferente
+continua sendo recusada.
+
+O worker encerra ao perder o processo principal e nos reinícios solicitados pelo
+gerenciador. Antes de sair, fecha o transporte sem executar logout e aguarda a
+gravação das credenciais e chaves. O novo worker aguarda a saída do anterior,
+evitando duas conexões locais para a mesma sessão. Consultar a dashboard não
+antecipa as tentativas de reinício de um worker que esteja falhando.
+
+Cada chip grava eventos em `STORAGE_DIR/chips/<id>/connection-events.log`, com
+horário, código da queda, motivo, ação e tempo da próxima tentativa. O arquivo
+é limitado a 128 KB, com uma cópia anterior em `.log.1`; não registra QR Codes,
+conteúdo de mensagens ou chaves de autenticação. O código 440 identifica uma
+conexão substituída: a reconexão automática é pausada para evitar disputa com
+outra instância. Encerre a instância duplicada antes de reiniciar o serviço.
+Um logout real do WhatsApp (401) ainda exige novo QR Code.
+
+`npm run test:connection` reproduz quedas consecutivas, erros temporários de
+identidade, persistência pendente, eventos atrasados, processos órfãos, reinício
+sem sobreposição e isolamento entre workers, sem conectar contas reais.
+
+### Dashboard e telas responsivas
+
+As páginas de gestão ocupam a largura disponível da janela. A dashboard tem
+cabeçalho compacto, filtros de 7/14/30 dias e por chip, gráficos de área/linhas/barras,
+distribuição dos atendimentos, mapa de mensagens por hora e comparativo dos chips.
+Os totais de mensagens usam o período selecionado, em horário de Brasília; os
+atendimentos e resultados comerciais representam a situação atual. Os resultados
+dos funis são independentes do filtro de chip. Os dados atualizam a cada 30 segundos
+com a aba visível, e o relatório CSV inclui o resumo e os valores diários filtrados.
+
+`npm run test:dashboard` verifica filtros, gráficos, exportação e adaptação a
+monitores de 1366 a 3440 pixels e celular, usando dados locais de teste.
+
+### WhatsApp Business e entrega de mensagens
+
+A conexão por QR usa dispositivos vinculados do WhatsApp, inclusive do aplicativo
+WhatsApp Business. No celular, abra **Dispositivos conectados → Conectar um
+dispositivo** e escaneie o QR do chip no painel.
+
+O bot fornece os conteúdos originais ao mecanismo `getMessage` do Baileys quando
+o WhatsApp solicita um reenvio. Um cache limitado atende mensagens recém-enviadas;
+o histórico persistido permite recuperá-las após reiniciar o worker, incluindo
+as chaves de mídia e os aliases entre telefone e LID. Isso corrige a ausência
+de recuperação que podia deixar a mensagem visível no painel enquanto o celular
+mostrava “aguardando mensagem”.
+
+Após atualizar e reiniciar o servidor, teste mensagens novas nos dois sentidos,
+incluindo texto e mídia. O aviso sozinho não identifica a causa: se continuar,
+verifique conexão, confirmações de entrega e logs do worker. Conteúdos antigos
+sem o payload original salvo não podem ser recuperados por esse mecanismo.
+
+Essa conexão não implementa a API oficial WhatsApp Business Platform/Cloud API.
+
 ### Importar contatos
 
 Em **Contatos → Importar contatos**, envie um CSV UTF-8 de até 2 MB e 5.000
@@ -149,6 +235,8 @@ Sem Postgres configurado, os dados ficam em `./database.sqlite` (ou dentro de
    - `ADMIN_USERNAME` / `ADMIN_PASSWORD` — login do painel.
    - `SESSION_SECRET` — string aleatória longa.
    - `STORAGE_DIR=/app/storage` — mesmo caminho do Volume criado no passo 3.
+     Se ficar vazio, o app usa `RAILWAY_VOLUME_MOUNT_PATH`, fornecido pela Railway.
+     Um caminho explícito continua tendo prioridade para preservar os dados existentes.
    - Não é necessário definir `DATABASE_URL` (o Railway já injeta) nem `PORT`
      (o Railway também injeta).
 5. **Deploy.** O Railway detecta automaticamente que é um projeto Node
@@ -158,6 +246,16 @@ Sem Postgres configurado, os dados ficam em `./database.sqlite` (ou dentro de
 
 ### Observações importantes
 
+- Execute `npm run check:storage` no ambiente do serviço para conferir o caminho.
+  O comando não abre conexão com o WhatsApp nem lê credenciais. Na Railway, retorna
+  erro se não houver volume ou se `STORAGE_DIR` estiver fora dele; o servidor também
+  registra um aviso ao iniciar. PostgreSQL guarda os dados do painel, mas as chaves
+  do WhatsApp, o histórico local dos workers e as mídias dependem do volume.
+- Ao corrigir um caminho fora do volume, preserve primeiro os arquivos do diretório
+  antigo com os workers parados e copie-os para uma pasta exclusiva dentro do volume.
+  Só então altere `STORAGE_DIR` e reinicie. Trocar apenas a variável ou o ponto de
+  montagem pode esconder as sessões e mídias atuais. Uma sessão já apagada ou
+  revogada pelo WhatsApp exige um novo pareamento.
 - As sessões de login do painel ficam em memória (`express-session` sem
   store externo). Isso é suficiente para um único serviço/instância — se você
   reiniciar o deploy, só será necessário logar de novo no painel (a conexão

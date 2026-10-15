@@ -4,7 +4,7 @@ const fs = require('fs');
 // Todos os dados que precisam sobreviver a um redeploy (banco SQLite local,
 // caso não haja Postgres) ficam dentro de STORAGE_DIR. No Railway, aponte essa
 // variável para um Volume (ex.: STORAGE_DIR=/app/storage) para persistir.
-const STORAGE_DIR = process.env.STORAGE_DIR || __dirname;
+const STORAGE_DIR = require('./storage-path').resolveStorageDir();
 fs.mkdirSync(STORAGE_DIR, { recursive: true });
 
 const defaultUsername = (process.env.ADMIN_USERNAME || 'admin').trim().toLowerCase();
@@ -165,6 +165,7 @@ const SQLITE_MIGRATIONS = [
     whatsapp_msg_id TEXT DEFAULT ''
   )`,
   `CREATE INDEX IF NOT EXISTS idx_messages_number ON messages(number)`,
+  `CREATE INDEX IF NOT EXISTS idx_messages_number_at ON messages(number, at, id)`,
   `CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(whatsapp_msg_id)`,
   `CREATE TABLE IF NOT EXISTS contacts (
     number TEXT PRIMARY KEY,
@@ -385,6 +386,7 @@ if (usingPostgres) {
     await pool.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_context TEXT DEFAULT '{}'");
     await pool.query('CREATE TABLE IF NOT EXISTS message_receipts (whatsapp_msg_id TEXT PRIMARY KEY, status INTEGER NOT NULL)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_number ON messages(number)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_number_at ON messages(number, at, id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(whatsapp_msg_id)');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS contacts (

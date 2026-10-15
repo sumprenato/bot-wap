@@ -19,6 +19,7 @@ class BotManager extends EventEmitter {
     this.requests = new Map();
     this.respawnTimers = new Map();
     this.respawnAttempts = new Map();
+    this.stopping = new Map();
     this.sequence = 0;
   }
 
@@ -30,12 +31,15 @@ class BotManager extends EventEmitter {
   ensureWorker(chip) {
     if (!chip?.id) throw new Error('Chip inválido: precisa de id.');
     const chipId = chip.id;
+    if (this.stopping.has(chipId) || this.respawnTimers.has(chipId)) {
+      throw Object.assign(new Error('O serviço deste chip está reiniciando. Aguarde alguns instantes.'), { code: 'WORKER_RESTARTING' });
+    }
     let entry = this.workers.get(chipId);
     if (this.isAlive(entry)) return entry;
 
     if (entry?.child) {
-      entry.intentional = true;
-      try { entry.child.kill(); } catch { /* já encerrado */ }
+      this.stopChip(chipId);
+      throw Object.assign(new Error('O serviço deste chip está reiniciando. Aguarde alguns instantes.'), { code: 'WORKER_RESTARTING' });
     }
     clearTimeout(this.respawnTimers.get(chipId));
     this.respawnTimers.delete(chipId);
@@ -77,7 +81,7 @@ class BotManager extends EventEmitter {
           chip.identity_verified = 1;
           child.send({ type: 'identity-result', id: message.id, number: message.number });
         } catch (error) {
-          if (!entry.intentional && child.connected) child.send({ type: 'identity-result', id: message.id, error: error.message });
+          if (!entry.intentional && child.connected) child.send({ type: 'identity-result', id: message.id, error: error.message, code: error.code });
         }
         return;
       }
@@ -207,6 +211,7 @@ class BotManager extends EventEmitter {
   async disconnect(chip) { return this.request(chip, 'disconnect', {}, LONG_REQUEST_TIMEOUT_MS); }
 
   stopChip(chipId) {
+    if (this.stopping.has(chipId)) return this.stopping.get(chipId).stoppingPromise;
     clearTimeout(this.respawnTimers.get(chipId));
     this.respawnTimers.delete(chipId);
     this.respawnAttempts.delete(chipId);
@@ -218,25 +223,45 @@ class BotManager extends EventEmitter {
         request.reject(new Error('Este canal foi encerrado. Atualize a conexão antes de tentar novamente.'));
       }
       entry.pending.clear();
-      try { entry.child.kill(); } catch { /* já encerrado */ }
     }
     this.workers.delete(chipId);
+    if (!entry?.child || entry.child.exitCode !== null) return Promise.resolve();
+    this.stopping.set(chipId, entry);
+    entry.stoppingPromise = new Promise(resolve => {
+      let timer, fallback;
+      const done = () => {
+        clearTimeout(timer); clearTimeout(fallback);
+        entry.child.removeListener('exit', done);
+        if (this.stopping.get(chipId) === entry) this.stopping.delete(chipId);
+        resolve();
+      };
+      entry.child.once('exit', done);
+      timer = setTimeout(() => {
+        fallback = setTimeout(done, 1000);
+        try { entry.child.kill('SIGKILL'); } catch { /* already exited */ }
+      }, 6000);
+      // IPC shutdown also works on Windows, where kill(SIGTERM) terminates immediately.
+      try {
+        if (entry.child.connected) entry.child.send({ type: 'shutdown' }, error => {
+          if (error) { try { entry.child.kill(); } catch { done(); } }
+        });
+        else entry.child.kill();
+      } catch { try { entry.child.kill(); } catch { done(); } }
+    });
+    return entry.stoppingPromise;
   }
 
   // Reinicia o worker de um chip (ex: após edição do perfil)
-  restart(chip) {
-    this.stopChip(chip.id);
+  async restart(chip) {
+    await this.stopChip(chip.id);
     return this.ensureWorker(chip);
   }
 
   async stopAll() {
     for (const timer of this.respawnTimers.values()) clearTimeout(timer);
     this.respawnTimers.clear();
-    for (const entry of this.workers.values()) {
-      entry.intentional = true;
-      try { entry.child.kill(); } catch { /* já encerrado */ }
-    }
-    this.workers.clear();
+    const stops = [...this.workers.keys()].map(chipId => this.stopChip(chipId));
+    await Promise.all([...stops, ...[...this.stopping.values()].map(entry => entry.stoppingPromise)]);
   }
 }
 

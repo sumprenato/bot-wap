@@ -15,7 +15,10 @@
   <link rel="stylesheet" href="/assets/css/pages/inbox.css?v=20261008-1" />
 
   <link rel="stylesheet" href="/assets/css/motion.css?v=20261007-4" />
-  <script defer src="/assets/js/site.js?v=20261007-4"></script>
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261014-1" />
+  <link rel="stylesheet" href="/assets/css/premium.css?v=20261015-3" />
+  <link rel="stylesheet" href="/assets/css/charts.css?v=20261015-2" />
+  <script defer src="/assets/js/site.js?v=20261015-3"></script>
 </head>
 <body>
   <div class="app">
@@ -262,96 +265,7 @@
 
       <!-- ===== PAGE: DASHBOARD ===== -->
       <section class="page-view page-panel" id="overviewPage" data-page-view="overview">
-        <div class="page-panel-inner dashboard-inner">
-          <header class="page-heading dashboard-intro">
-            <svg class="dashboard-orbit" viewBox="0 0 280 200" fill="none" aria-hidden="true"><circle cx="156" cy="96" r="76"/><circle cx="156" cy="96" r="48"/><path d="M24 174 226 12M67 200 267 38"/><circle class="orbit-point" cx="101" cy="148" r="11"/><path class="orbit-spark" d="m226 84 6 17 17 6-17 6-6 17-6-17-17-6 17-6Z"/></svg>
-            <div>
-              <p class="eyebrow">seu espaço de conexões</p>
-              <h2>Dashboard</h2>
-              <p>Uma visão clara de cada conversa.</p>
-            </div>
-            <div class="page-heading-meta">
-              <span class="page-date" id="overviewDate"></span><span id="reportExportSlot"></span>
-              <span class="status-pill" id="overviewStatusPill">
-                <span class="status-dot"></span>
-                <span id="overviewChannel">offline</span>
-              </span>
-              <button type="button" class="text-action dashboard-open-inbox" data-page-link="inbox">Abrir atendimento <span aria-hidden="true">↗</span></button>
-            </div>
-          </header>
-          <h3 class="dashboard-section-label"><span class="live-indicator"></span> Atendimento em tempo real</h3>
-          <div class="metric-grid live-metrics"><article class="metric-card metric-card--primary" id="dashCardOpen" style="cursor:pointer" title="Ver conversas abertas">
-              <div class="metric-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              </div>
-              <span>Conversas Abertas</span>
-              <strong id="overviewTotal">0</strong>
-              <small>em andamento agora</small>
-            </article><article class="metric-card metric-card--contacts" id="dashCardFinalized" style="cursor:pointer" title="Ver conversas finalizadas">
-              <div class="metric-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <span>Finalizadas</span>
-              <strong id="overviewFinalized">0</strong>
-              <small>conversas encerradas</small>
-            </article><article class="metric-card metric-card--messages">
-              <div class="metric-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              </div>
-              <span>Mensagens</span>
-              <strong id="overviewMessages">0</strong>
-              <small>em todas as conversas</small>
-            </article><article class="metric-card metric-card--status">
-              <div class="metric-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              </div>
-              <span>Canal</span>
-              <strong id="overviewChannelCard">offline</strong>
-              <small>status do WhatsApp</small>
-            </article></div>
-          <h3 class="dashboard-section-label">Resultados do atendimento</h3>
-          <div class="dashboard-report-grid">
-            <div class="dashboard-report-main">
-              <div class="metric-grid report-metrics"><article class="metric-card metric-card--kanban">
-              <div class="metric-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              </div>
-              <span>Receita (Ganhos)</span>
-              <strong id="overviewRevenue">R$ 0</strong>
-              <small>oportunidades ganhas</small>
-            </article><article class="metric-card metric-card--conversion">
-              <div class="metric-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-              </div>
-              <span>Taxa de Conversão</span>
-              <strong id="overviewConversion">0%</strong>
-              <small>oportunidades ganhas/total</small>
-            </article>
-                <article class="metric-card metric-card--contacts"><span>Base de contatos</span><strong id="overviewContactTotal">0</strong><small>contatos no chip principal</small></article>
-              </div>
-              <section class="activity-panel">
-                <div class="section-heading"><div><h3>Movimentação das mensagens</h3><p>Mensagens do histórico disponível no painel.</p></div><div class="period-buttons" role="group" aria-label="Período do gráfico"><button type="button" class="is-active" data-chart-days="7" aria-pressed="true">7 dias</button><button type="button" data-chart-days="30" aria-pressed="false">30 dias</button></div></div>
-                <div id="activityChartLegend" class="chart-legend"><span><i class="legend-received"></i>Recebidas</span><span><i class="legend-sent"></i>Enviadas</span></div>
-                <div id="activityChart" class="activity-chart" role="region" tabindex="0" aria-label="Mensagens por dia"></div>
-                <div id="activityChartEmpty" class="chart-empty" hidden><span class="chart-empty-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4v16h16M8 15v-4M13 15V7M18 15v-6"/></svg></span><strong>Sem movimentação neste período</strong><p>As mensagens recebidas e enviadas aparecerão aqui. Selecione outro período para consultar o histórico.</p></div>
-                <p id="activityChartSummary" class="chart-summary" aria-live="polite"></p>
-              </section>
-            </div>
-            <aside class="dashboard-recent"><div class="panel-section">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">atividade recente</p>
-                <h3>Conversas em andamento</h3>
-              </div>
-              <button class="text-action" type="button" data-page-link="inbox">
-                ver atendimento
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-              </button>
-            </div>
-            <div class="overview-list" id="overviewList"></div>
-          </div></aside>
-          </div>
-        </div>
+        <div class="page-panel-inner dashboard-inner" id="dashboardAnalytics"></div>
       </section>
 
       <!-- ===== PAGE: KANBAN ===== -->

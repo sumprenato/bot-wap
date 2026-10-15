@@ -25,10 +25,11 @@ test('QR identity gates contacts/messages, persists the actual phone and refuses
   const load = Module._load;
   Module._load = function (name, ...args) {
     if (name === '@whiskeysockets/baileys') return {
-      default: () => {
+      default: (config) => {
         const handlers = {};
         const socket = { user: null, ev: { on: (event, callback) => { handlers[event] = callback; } }, handlers,
           ws: { close() {} }, logout: async () => { socket.loggedOut = true; }, resyncAppState: async () => {}, sendMessage: async (jid, content, options) => { sent.push({ jid, content, options }); return { key: { id: `sent-${sent.length}`, remoteJid: jid, fromMe: true }, message: content.text ? { conversation: content.text } : {}, status: 1 }; } };
+        socket.config = config;
         sockets.push(socket); return socket;
       },
       useMultiFileAuthState: async () => ({ state: { creds: { myAppStateKeyId: 'test-key' }, keys: { set: async () => {}, get: async (type) => type === 'app-state-sync-key' ? { 'test-key': {} } : { critical_unblock_low: { version: 1 } } } }, saveCreds: async () => {} }),
@@ -158,6 +159,8 @@ test('QR identity gates contacts/messages, persists the actual phone and refuses
   await bot.sendToClient(savedNumber, 'Sem assinatura', null);
   assert.equal(sent.at(-1).content.text, 'Sem assinatura');
   const lastSentId = `sent-${sent.length}`;
+  assert.deepEqual(await correct.config.getMessage({ remoteJid: `${savedNumber}@s.whatsapp.net`, id: lastSentId }), { conversation: 'Sem assinatura' }, 'retry callback returns the actual sent payload');
+  assert.equal(await first.config.getMessage({ remoteJid: `${savedNumber}@s.whatsapp.net`, id: lastSentId }), undefined, 'stale sockets cannot retrieve payloads');
   assert.equal((await store.getConversation(savedNumber)).messages.at(-1).deliveryStatus, 1);
   for (const [status, expected] of [[2, 2], [3, 3], [4, 4], [2, 4]]) {
     await correct.handlers['messages.update']([{ key: { id: lastSentId, fromMe: true, remoteJid: `${savedNumber}@s.whatsapp.net` }, update: { status } }]);

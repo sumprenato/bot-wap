@@ -9,7 +9,9 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 
-const STORAGE_DIR = process.env.STORAGE_DIR || __dirname;
+const { resolveStorageDir, reportStorage } = require('./storage-path');
+const STORAGE_DIR = resolveStorageDir();
+reportStorage();
 const ADMIN_NUMBER = (process.env.ADMIN_NUMBER || '').replace(/\D/g, '');
 const STATE_FILE = path.join(STORAGE_DIR, 'session-state.json');
 const AUTH_DIR = path.join(STORAGE_DIR, 'auth_info');

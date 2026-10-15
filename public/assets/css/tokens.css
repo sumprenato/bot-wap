@@ -1,0 +1,43 @@
+/* Shared Bot WAP palette for authentication and workspace. */
+:root {
+  --bg: #101214;
+  --surface: #191c1f;
+  --surface-2: #202428;
+  --surface-3: #2a3035;
+  --border: #3a4249;
+  --border-subtle: #2b3136;
+  --text: #f2f5f4;
+  --text-dim: #a9b3b3;
+  --text-faint: #8b989a;
+  --brand: #73dcb0;
+  --brand-ink: #09291e;
+  --live: #73dcb0;
+  --admin: #b5a1f4;
+  --danger: #fb8f9d;
+  --warm: #e8be7a;
+  --card-shadow: 0 2px 3px #0000000a, 0 8px 24px #00000012;
+  --shadow: 0 16px 48px #00000035;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --motion-ease: cubic-bezier(.22, 1, .36, 1);
+}
+:root[data-theme="light"] {
+  --bg: #f5f7f8;
+  --surface: #ffffff;
+  --surface-2: #f1f4f5;
+  --surface-3: #e7edef;
+  --border: #cbd5da;
+  --border-subtle: #e1e7ea;
+  --text: #17262c;
+  --text-dim: #53656d;
+  --text-faint: #667980;
+  --brand: #087a56;
+  --brand-ink: #ffffff;
+  --live: #087a56;
+  --admin: #7354bd;
+  --danger: #c43d56;
+  --warm: #946119;
+  --card-shadow: 0 1px 2px #16303a05, 0 4px 18px #16303a05;
+  --shadow: 0 16px 48px #16303a18;
+}

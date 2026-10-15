@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { api, loginDestination } from "./api";
+import { Icon } from './icons';
+
+export function LoginThemeSwitch() {
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+  return <div className="auth-theme-switch" role="group" aria-label="Tema da tela de acesso">{[['dark', 'moon', 'Tema escuro'], ['light', 'sun', 'Tema claro']].map(([value, icon, label]) => <button key={value} type="button" aria-label={label} title={label} aria-pressed={theme === value} onClick={() => {
+    document.documentElement.dataset.theme = value;
+    window.BotWapStorage?.local.set('bwap-theme', value);
+    setTheme(value);
+  }}><Icon name={icon} size={16}/></button>)}</div>;
+}
 
 export function LoginCard() {
   const [mode, setMode] = useState("login"),
@@ -30,14 +40,9 @@ export function LoginCard() {
   });
   return (
     <div className="login-card" data-react-component="Login">
-      <div className="login-brand">
-        <span className="login-brand-mark" />
-        <span>
-          BOT <b>WAP</b>
-        </span>
-      </div>
+      <div className="login-card-icon"><Icon name="conversation" size={23}/></div>
       <div className="login-header">
-        <p className="login-kicker">central de atendimento</p>
+        <p className="login-kicker">Acesso ao painel</p>
         <h1 id="authTitle">
           {register ? (
             <>
@@ -45,9 +50,7 @@ export function LoginCard() {
             </>
           ) : (
             <>
-              Seu espaço.
-              <br />
-              <em>Sua conexão.</em>
+              Boas-vindas.
             </>
           )}
         </h1>
@@ -69,6 +72,15 @@ export function LoginCard() {
             role="tab"
             className={"auth-tab" + (mode === value ? " is-active" : "")}
             aria-selected={mode === value}
+            aria-controls="loginForm"
+            tabIndex={mode === value ? 0 : -1}
+            onKeyDown={event => {
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+              event.preventDefault();
+              const next = event.key === 'Home' ? 'login' : event.key === 'End' ? 'register' : mode === 'login' ? 'register' : 'login';
+              setMode(next); setError('');
+              document.getElementById(next === 'login' ? 'loginTab' : 'registerTab')?.focus();
+            }}
             onClick={() => {
               setMode(value);
               setError("");
@@ -80,6 +92,8 @@ export function LoginCard() {
       </div>
       <form
         id="loginForm"
+        role="tabpanel"
+        aria-labelledby={register ? 'registerTab' : 'loginTab'}
         noValidate
         onSubmit={async (event) => {
           event.preventDefault();
@@ -105,6 +119,7 @@ export function LoginCard() {
       >
         <div className="input-group">
           <label htmlFor="username">Usuário</label>
+          <div className="auth-input"><Icon name="user" size={17}/>
           <input
             {...input("username")}
             id="username"
@@ -117,10 +132,12 @@ export function LoginCard() {
             pattern="[A-Za-z0-9_.-]+"
             required
           />
+          </div>
         </div>
         {register && (
           <div className="input-group register-fields" id="displayNameField">
             <label htmlFor="displayName">Nome no painel</label>
+            <div className="auth-input"><Icon name="user" size={17}/>
             <input
               {...input("displayName")}
               id="displayName"
@@ -129,11 +146,13 @@ export function LoginCard() {
               required
               placeholder="Nome que aparecerá nas mensagens"
             />
+            </div>
           </div>
         )}
         <div className="input-group">
           <label htmlFor="password">Senha</label>
           <div className="password-field">
+            <Icon name="lock" size={17}/>
             <input
               {...input("password")}
               id="password"
@@ -147,9 +166,10 @@ export function LoginCard() {
               type="button"
               id="togglePassword"
               aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
+              aria-pressed={visible}
               onClick={() => setVisible(!visible)}
             >
-              {visible ? "ocultar" : "mostrar"}
+              <Icon name={visible ? 'eyeOff' : 'eye'} size={18}/>
             </button>
           </div>
         </div>
@@ -157,6 +177,7 @@ export function LoginCard() {
           <div className="register-fields" id="registerFields">
             <div className="input-group">
               <label htmlFor="confirmPassword">Confirmar senha</label>
+              <div className="auth-input"><Icon name="lock" size={17}/>
               <input
                 {...input("confirmPassword")}
                 id="confirmPassword"
@@ -165,6 +186,7 @@ export function LoginCard() {
                 autoComplete="new-password"
                 placeholder="Repita sua senha"
               />
+              </div>
             </div>
           </div>
         )}
@@ -195,15 +217,17 @@ export function LoginCard() {
           className={"login-btn" + (busy ? " is-loading" : "")}
           id="authSubmit"
           disabled={busy}
+          aria-busy={busy}
         >
           {busy ? "Entrando…" : register ? "Criar acesso" : "Entrar no Painel"}
+          {!busy && <Icon name="arrowRight" size={17}/>}
         </button>
         <p id="errorMsg" className="error-msg" role="alert" hidden={!error}>
           {error}
         </p>
       </form>
       <p className="login-footnote">
-        <span /> ambiente protegido e privado
+        <Icon name="lock" size={12}/> ambiente protegido e privado
       </p>
     </div>
   );

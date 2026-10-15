@@ -11,8 +11,8 @@ test('workers start without a typed phone and acknowledge identity only after ve
     environments.push(options.env);
     const child = new EventEmitter();
     Object.assign(child, { exitCode: null, killed: false, connected: true, sent: [],
-      send(message, callback) { this.sent.push(message); callback?.(); },
-      kill() { this.killed = true; this.connected = false; } });
+      send(message, callback) { this.sent.push(message); callback?.(); if (message.type === 'shutdown') this.kill(); },
+      kill() { this.killed = true; this.connected = false; this.exitCode = 0; queueMicrotask(() => this.emit('exit', 0)); } });
     children.push(child);
     return child;
   };
@@ -35,7 +35,7 @@ test('workers start without a typed phone and acknowledge identity only after ve
   manager.on('event', (event) => events.push(event));
   children[0].emit('message', { type: 'event', event: 'status', payload: { connected: true, number: chip.number } });
   assert.equal(events[0].chipNumber, '5511999992222');
-  manager.stopChip(1);
+  await manager.stopChip(1);
   manager.ensureWorker(chip);
   assert.equal(environments[1].EXPECTED_ACCOUNT_NUMBER, '5511999992222');
   children[0].emit('message', { type: 'event', event: 'message', payload: 'stale' });
@@ -49,7 +49,7 @@ test('workers start without a typed phone and acknowledge identity only after ve
   const otherWorker = manager.ensureWorker(other);
   assert.notEqual(environments[2].STORAGE_DIR, environments[1].STORAGE_DIR, 'each chip has its own credentials, database and media directory');
   const healthy = manager.workers.get(1);
-  manager.stopChip(2);
+  await manager.stopChip(2);
   assert.equal(otherWorker.child.killed, true);
   assert.equal(manager.workers.get(1), healthy);
   assert.equal(healthy.child.connected, true);

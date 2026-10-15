@@ -350,7 +350,7 @@ export function useSiteMotion(root) {
     const seen = new WeakSet(),
       animations = new Set();
     const selectors =
-      ".metric-card,.campaign-card,.chip-card,.flow-card,.webhook-card,.kanban-card,.data-table tbody tr,.tag-settings-item,.inline-editor,.page-notice";
+      ".page-heading,.analytics-header,.analytics-toolbar,.analytics-metric,.analytics-panel,.metric-card,.campaign-card,.chip-card,.flow-card,.webhook-card,.kanban-column,.kanban-card,.data-table tbody tr,.table-toolbar,.team-filters,.tag-settings-item,.profile-settings-card,.settings-card,.inline-editor,.page-notice,.convo-item,.contact-item,.chat-header,.composer";
     const animate = (element, index = 0) => {
       if (
         preference.matches ||
@@ -363,13 +363,14 @@ export function useSiteMotion(root) {
       seen.add(element);
       const animation = element.animate(
         [
-          { opacity: 1, translate: "0 6px" },
+          { opacity: .25, translate: "0 10px" },
           { opacity: 1, translate: "0 0" },
         ],
         {
-          duration: 300,
-          delay: Math.min(index, 5) * 35,
-          easing: "cubic-bezier(.2,.75,.25,1)",
+          duration: 420,
+          delay: Math.min(index, 4) * 30,
+          easing: "cubic-bezier(.22,1,.36,1)",
+          fill: 'backwards',
         },
       );
       animations.add(animation);
@@ -377,17 +378,48 @@ export function useSiteMotion(root) {
         .catch(() => {})
         .finally(() => animations.delete(animation));
     };
-    [...root.current.querySelectorAll(selectors)].forEach(animate);
-    const observer = new MutationObserver((records) => {
+    // Observe visibility so below-the-fold cards enter when actually seen.
+    const observed = new WeakSet();
+    const visibility = new IntersectionObserver(entries => {
       let index = 0;
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        animate(entry.target, index++);
+        visibility.unobserve(entry.target);
+      }
+    }, { threshold: .04 });
+    const observe = element => {
+      if (observed.has(element)) return;
+      observed.add(element);
+      visibility.observe(element);
+    };
+    [...root.current.querySelectorAll(selectors)].forEach(observe);
+    const pending = new Set();
+    let frame;
+    const scan = () => {
+      frame = null;
+      for (const node of pending) {
+        if (!node.isConnected) continue;
+        if (node.matches(selectors)) observe(node);
+        for (const item of node.querySelectorAll(selectors)) observe(item);
+      }
+      pending.clear();
+    };
+    const observer = new MutationObserver((records) => {
       for (const record of records) {
+        for (const node of record.removedNodes) {
+          if (!(node instanceof Element)) continue;
+          for (const item of [node, ...node.querySelectorAll(selectors)]) {
+            visibility.unobserve(item);
+            observed.delete(item);
+          }
+        }
         for (const node of record.addedNodes) {
           if (!(node instanceof Element)) continue;
-          if (node.matches(selectors)) animate(node, index++);
-          for (const item of node.querySelectorAll(selectors))
-            animate(item, index++);
+          pending.add(node);
         }
       }
+      if (pending.size && frame == null) frame = requestAnimationFrame(scan);
     });
     observer.observe(root.current, { childList: true, subtree: true });
     const cancel = () => {
@@ -397,6 +429,9 @@ export function useSiteMotion(root) {
     preference.addEventListener("change", cancel);
     return () => {
       observer.disconnect();
+      visibility.disconnect();
+      cancelAnimationFrame(frame);
+      pending.clear();
       cancel();
       preference.removeEventListener("change", cancel);
     };

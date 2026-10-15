@@ -80,7 +80,7 @@ export function Chips({ ctx }) {
       </form>
     </ChipDialog>}
     {qrChip && ctx.can('chips.gerenciar') && <ChipDialog title={`WhatsApp · ${qrChip.name}`} close={close}>
-      {qrChip._connected ? <div className="chip-connected"><Icon name="check" size={40} /><h3>WhatsApp conectado</h3><p>{phone(qrChip.number)}</p></div> : <>
+      {qrChip._connected ? <div className="chip-connected"><Icon name="check" size={40} /><h3>WhatsApp conectado</h3><p>{phone(qrChip.number)}</p><p role="status">{qrChip._historySync?.error || (qrChip._historySync?.importing ? `Importando histórico dos últimos 7 dias… ${qrChip._historySync.imported} mensagens salvas.` : qrChip._historySync?.imported ? `${qrChip._historySync.imported} mensagens do histórico salvas.${qrChip._historySync.failed ? ` ${qrChip._historySync.failed} não puderam ser importadas.` : ''}` : 'Aguardando o histórico dos últimos 7 dias disponibilizado pelo WhatsApp.')}</p></div> : <>
         <p className="chip-modal-description">No WhatsApp, abra <strong>Aparelhos conectados → Conectar dispositivo</strong> e escaneie este QR Code.</p>
         {qrChip._error && <p className="profile-error" role="alert">{qrChip._error}</p>}
         <div className="chip-qr-area">{qrChip._qr ? <img className="chip-qr-img" src={qrChip._qr} alt={`QR Code para conectar ${qrChip.name}`} /> : <p role="status">Gerando QR Code…</p>}</div>

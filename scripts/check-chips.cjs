@@ -55,9 +55,10 @@ async function main() {
     await bot.verifyIdentity(firstId, '5511999992222');
     const entry = bot.workers.get(firstId);
     entry.chip.number = '5511999992222'; entry.chip.identity_verified = 1;
-    entry.status = { connected: true, number: '5511999992222', admin: '5511999992222', qr: null };
+    entry.status = { connected: true, number: '5511999992222', admin: '5511999992222', qr: null, historySync: { days: 7, importing: false, imported: 237, failed: 0 } };
     bot.emit('event', { userId: entry.chip.user_id, chipId: firstId, chipNumber: entry.chip.number, event: 'status', payload: entry.status });
     await page.getByRole('heading', { name: 'WhatsApp conectado' }).waitFor();
+    await page.getByText('237 mensagens do histórico salvas.', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Fechar', exact: true }).last().click();
     await page.reload();
     await page.locator('.chip-status-pill.is-online').waitFor();

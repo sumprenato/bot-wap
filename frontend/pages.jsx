@@ -10,6 +10,7 @@ import {
 import { Action, ActionMenu, DataTable, Empty } from "./components";
 import { Avatar } from "./avatar";
 import { Chips } from "./chips";
+import { Dashboard } from './dashboard';
 
 const money = (value) =>
   Number(value || 0).toLocaleString("pt-BR", {
@@ -1000,6 +1001,7 @@ export function pageAttributes(ctx, id, node) {
   return {};
 }
 export function pageSlot(ctx, id, node) {
+  if (id === 'dashboardAnalytics') return <Dashboard ctx={ctx} />;
   if (id === 'reportExportSlot') return <Action className="text-action" permission="relatorios.exportar" action={async () => { const response = await fetch('/api/dashboard/export', { credentials: 'same-origin' }); if (!response.ok) throw new Error((await response.json()).error); const url = URL.createObjectURL(await response.blob()); const link = document.createElement('a'); link.href = url; link.download = 'relatorio-bot-wap.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }}>Exportar relatório</Action>;
   const d = ctx.data,
     f = ctx.fields;

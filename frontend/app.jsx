@@ -11,12 +11,13 @@ import { api, getApiChannel, setApiChannel, cleanNumber, requireLogin, routes } 
 import { Workspace, useSiteMotion } from "./components";
 import { pageActions, pageAttributes, pageSlot, pageSubmits } from "./pages";
 import { inboxActions, inboxAttributes, inboxSlot, inboxSubmit } from "./inbox";
-import { InteractionEffects } from "./motion";
+import { AnimatedNumber, InteractionEffects } from "./motion";
 import { Avatar, invalidatePhotos } from "./avatar";
 import { useAttendancePreferences } from './attendance-preferences';
 import { can, pagePermissions, resourcePermissions, actionPermission } from './access';
 import { TeamEditor, TeamList } from './team';
 import { AccountSettings } from './account-settings';
+import { mergeConversationMap } from '../conversation-update';
 
 const defaults = {
   contacts: [],
@@ -51,7 +52,7 @@ const resources = {
   state: ["/api/state", null],
 };
 const pageResources = {
-  overview: ["stats", "kanban"],
+  overview: ["kanban"],
   campaigns: ["campaigns"],
   flows: ["flows", "variables"],
   webhooks: ["webhooks"],
@@ -363,10 +364,7 @@ export function Application({ layout, page, title, onNavigate }) {
         ...previous,
         state: {
           ...previous.state,
-          conversations: {
-            ...previous.state.conversations,
-            [conversation.number]: conversation,
-          },
+          conversations: mergeConversationMap(previous.state.conversations, conversation),
         },
       }));
     });
@@ -383,7 +381,7 @@ export function Application({ layout, page, title, onNavigate }) {
     let contactsRefresh = null;
     socket.on("contacts:updated", (payload) => {
       if (payload?.chipId && String(payload.chipId) !== getApiChannel()) return;
-      if (!contactsRefresh) contactsRefresh = Promise.all([load("contacts"), load("state")])
+      if (!contactsRefresh) contactsRefresh = Promise.all([load("contacts"), ...(payload?.contactChanged ? [] : [load("state")])])
         .catch(error => notify(error.message)).finally(() => { contactsRefresh = null; });
     });
     socket.on("profile:updated", ({ number }) => invalidatePhotos(number));
@@ -404,7 +402,7 @@ export function Application({ layout, page, title, onNavigate }) {
     socket.on("chip:status", (status) => setData((previous) => {
       const chips = previous.state.chips?.map((chip) => String(chip.chipId) === String(status.chipId) ? { ...chip, ...status } : chip) || [];
       return { ...previous,
-        chips: previous.chips.map((chip) => String(chip.id) === String(status.chipId) ? { ...chip, number: status.number ?? chip.number, _connected: status.connected, _qr: status.qr, _error: status.error || '' } : chip),
+        chips: previous.chips.map((chip) => String(chip.id) === String(status.chipId) ? { ...chip, number: status.number ?? chip.number, _connected: status.connected, _qr: status.qr, _error: status.error || '', _historySync: status.historySync } : chip),
         state: { ...previous.state, chips, status: { ...previous.state.status, connected: chips.some((chip) => chip.connected), connectedCount: chips.filter((chip) => chip.connected).length },
           channelStatus: String(previous.state.chipId) === String(status.chipId) ? { ...previous.state.channelStatus, ...status } : previous.state.channelStatus }
       };
@@ -443,7 +441,7 @@ export function Application({ layout, page, title, onNavigate }) {
       const results = await Promise.allSettled(data.chips.map((chip) => api(`/api/chips/${chip.id}/status`)));
       if (active) setData((previous) => ({ ...previous, chips: previous.chips.map((chip) => {
         const result = results[data.chips.findIndex((item) => item.id === chip.id)];
-        return result?.status === 'fulfilled' ? { ...chip, number: result.value.number ?? chip.number, _connected: result.value.connected, _qr: result.value.qr, _error: result.value.error || '' } : chip;
+        return result?.status === 'fulfilled' ? { ...chip, number: result.value.number ?? chip.number, _connected: result.value.connected, _qr: result.value.qr, _error: result.value.error || '', _historySync: result.value.historySync } : chip;
       }) }));
     };
     fetchStatus();
@@ -716,6 +714,8 @@ export function Application({ layout, page, title, onNavigate }) {
     if (errors[id]) return errors[id];
     const result = pageSlot(ctx, id, node),
       value = result !== undefined ? result : inboxSlot(ctx, id, node);
+    if (typeof value === 'number' && /^(overview|convoCount|contactsNavCount|chipsBadge)/.test(id || ''))
+      return <AnimatedNumber value={value} />;
     if (
       (typeof value === "number" || typeof value === "string") &&
       /^(overview|convoCount|contactsCount|chipsBadge|bulkCount)/.test(id || "")

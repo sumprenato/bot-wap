@@ -8,39 +8,36 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/login.css?v=20261007-5">
+  <script src="/assets/js/storage.js"></script>
+  <script>document.documentElement.dataset.theme = window.BotWapStorage.local.get('bwap-theme') === 'light' ? 'light' : 'dark';</script>
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=20261015-3">
   <link rel="stylesheet" href="/assets/css/motion.css?v=20261007-4">
-  <script defer src="/assets/js/site.js?v=20261007-4"></script>
+  <link rel="stylesheet" href="/assets/css/login.css?v=20261015-3">
+  <script defer src="/assets/js/site.js?v=20261015-3"></script>
 </head>
 <body>
+  <div class="auth-shell">
+  <header class="auth-topbar">
+    <div class="login-wordmark"><span class="login-symbol" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="m7 9 2 5 3-5 3 5 2-5"/></svg></span><span>Bot WAP</span><span class="wordmark-note">Seu espaço de conversas.</span></div>
+    <div id="loginThemeSwitch"></div>
+  </header>
   <main class="auth-layout">
   <section class="login-intro" aria-label="Bot WAP">
-    <div class="login-wordmark"><span class="login-symbol" aria-hidden="true">w.</span> Bot WAP <span class="wordmark-note">espaço de conversas</span></div>
-    <p class="intro-kicker">conexões começam com uma conversa</p>
-    <h2>Mais perto.<br> Mais <span>possibilidades.</span></h2>
-    <p class="intro-description">Um espaço para ouvir, organizar e dar continuidade a cada conversa.</p>
-    <svg class="login-art" viewBox="0 0 460 260" fill="none" aria-hidden="true">
-      <path d="M28 190h397M370 25v210" stroke="#3c4960" stroke-dasharray="3 6"/>
-      <rect x="47" y="57" width="175" height="151" rx="30" fill="#f4a58a" transform="rotate(-8 47 57)"/>
-      <path d="m91 109 10 34 16-34 16 34 10-34" stroke="#302322" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="m78 180-4 42 49-35" fill="#f4a58a"/>
-      <rect x="203" y="77" width="163" height="114" rx="24" fill="#b9a6ed" transform="rotate(7 203 77)"/>
-      <path d="m322 198 21 32-3-39" fill="#b9a6ed"/>
-      <circle cx="240" cy="139" r="6" fill="#403356"/><circle cx="268" cy="142" r="6" fill="#403356"/><circle cx="296" cy="145" r="6" fill="#403356"/>
-      <circle cx="352" cy="56" r="27" stroke="#87cfbc"/><path d="m352 37 5 14 14 5-14 5-5 14-5-14-14-5 14-5Z" fill="#87cfbc"/>
-      <path d="M124 36C180-9 306 5 345 81" stroke="#98a6bc"/>
-      <circle cx="124" cy="36" r="4" fill="#f5f0e8"/>
-    </svg>
-    <div class="intro-caption"><span>Conversas</span><span>Organização</span><span>Relacionamentos</span></div>
+    <p class="intro-kicker"><span></span> Atendimento em um só lugar</p>
+    <h2>Mais clareza.<br><span>Em cada conversa.</span></h2>
+    <p class="intro-description">Conversas, equipe e resultados em um espaço organizado. Mais contexto para o seu próximo atendimento.</p>
+    <div class="login-preview" aria-hidden="true">
+      <div class="preview-heading"><span class="preview-dot"></span><span>Tudo começa com uma conversa.</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3M21 16v3a2 2 0 0 1-2 2h-3"/></svg></div>
+      <div class="preview-conversation"><div class="preview-message"><span class="preview-avatar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg></span><div><span>Contato</span><i></i><i></i></div></div><div class="preview-message preview-message--team"><span class="preview-avatar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m3 12 5 5L18 7M11 17 21 7"/></svg></span><div><span>Sua equipe</span><i></i><i></i></div></div></div>
+      <div class="preview-footer"><span class="preview-footer-mark">↗</span> Mais proximidade. Mais continuidade.</div>
+    </div>
+    <div class="intro-caption"><span>Atendimento</span><span>Organização</span><span>Resultados</span></div>
   </section>
   <div class="login-card">
-    <div class="login-brand">
-      <span class="login-brand-mark"></span>
-      <span>BOT <b>WAP</b></span>
-    </div>
+    <div class="login-card-icon" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2V11.5A8.5 8.5 0 0 1 10.5 3h2A8.5 8.5 0 0 1 21 11.5Z"/><path d="M7 10h9M7 14h5"/></svg></div>
     <div class="login-header">
-      <p class="login-kicker">central de atendimento</p>
-      <h1 id="authTitle">Seu espaço.<br><em>Sua conexão.</em></h1>
+      <p class="login-kicker">Acesso ao painel</p>
+      <h1 id="authTitle">Boas-vindas.</h1>
       <p id="authDescription">Entre para acompanhar suas conversas e cuidar de cada atendimento.</p>
     </div>
 
@@ -87,7 +84,8 @@
   </div>
 
   </main>
+  <footer class="auth-footer"><span>Bot WAP · Central de atendimento</span><span>Seu espaço para conectar.</span></footer>
+  </div>
   <script src="/config/config.js"></script>
-  <script src="assets/js/storage.js"></script>
 </body>
 </html>

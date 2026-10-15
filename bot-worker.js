@@ -3,6 +3,7 @@ const store = require('./store');
 const EventEmitter = require('events');
 
 const db = require('./db');
+const { installWorkerLifecycle } = require('./worker-lifecycle');
 
 // Erros soltos do Baileys/rede não podem matar o worker em silêncio.
 // Rejeições são só registradas; exceções reais encerram o processo para o
@@ -12,11 +13,20 @@ process.on('unhandledRejection', (reason) => {
 });
 process.on('uncaughtException', (error) => {
   console.error('[WORKER] uncaughtException:', error.stack || error);
-  process.exit(1);
+  lifecycle.shutdown(1);
 });
 
 const emitter = new EventEmitter();
 const pending = new Map();
+const lifecycle = installWorkerLifecycle({ stop: async () => {
+  for (const request of pending.values()) { clearTimeout(request.timer); request.reject(new Error('O serviço do WhatsApp está encerrando.')); }
+  pending.clear();
+  await bot.stopBot();
+}, close: () => db.close() });
+
+function send(message) {
+  if (process.connected) process.send(message, () => {});
+}
 
 bot.setIdentityVerifier((number) => new Promise((resolve, reject) => {
   const id = `identity-${Date.now()}-${number}`;
@@ -25,11 +35,11 @@ bot.setIdentityVerifier((number) => new Promise((resolve, reject) => {
     reject(new Error('Não foi possível confirmar a conta. Tente conectar novamente.'));
   }, 15000);
   pending.set(id, { resolve, reject, timer });
-  process.send?.({ type: 'identity', id, number });
+  send({ type: 'identity', id, number });
 }));
 
 function reply(id, result, error = null) {
-  if (process.send) process.send({ type: 'response', id, result, error: error?.message || error });
+  send({ type: 'response', id, result, error: error?.message || error });
 }
 
 async function handle(message) {
@@ -44,14 +54,14 @@ async function handle(message) {
     }
     if (action === 'state') {
       reply(id, {
-        conversations: await store.getAll(),
+        conversations: await store.getAll({ metadataOnly: payload.metadataOnly === true }),
         activeTarget: bot.getActiveTarget(),
         status: bot.getStatus(),
         admin: bot.ADMIN_NUMBER,
       });
       return;
     }
-    if (action === 'get-conversation') { reply(id, await store.getConversation(payload.number, false)); return; }
+    if (action === 'get-conversation') { reply(id, await store.getConversation(payload.number, false, { metadataOnly: payload.metadataOnly === true })); return; }
     if (action === 'forward-messages') { reply(id, { conversation: await bot.forwardMessages(payload.number, payload.targetNumber, payload.messageIds) }); return; }
     if (action === 'delete-messages') { reply(id, { conversation: { ...await bot.deleteMessages(payload.number, payload.messageIds, payload.forEveryone), mutation: 'delete' } }); return; }
     if (action === 'delete-contact') { reply(id, await store.removeSavedContact(payload.number)); return; }
@@ -151,33 +161,35 @@ async function handle(message) {
   }
 }
 
-emitter.on('status', (status) => process.send?.({ type: 'event', event: 'status', payload: status }));
-emitter.on('message', (conversation) => process.send?.({ type: 'event', event: 'message', payload: conversation }));
-emitter.on('contact', (contact) => process.send?.({ type: 'event', event: 'contact', payload: contact }));
-emitter.on('contacts:updated', (payload) => process.send?.({ type: 'event', event: 'contacts:updated', payload }));
-emitter.on('profile:updated', (payload) => process.send?.({ type: 'event', event: 'profile:updated', payload }));
-emitter.on('active-target', (target) => process.send?.({ type: 'event', event: 'active-target', payload: target }));
-emitter.on('log', (line) => process.send?.({ type: 'event', event: 'log', payload: line }));
+emitter.on('status', (status) => send({ type: 'event', event: 'status', payload: status }));
+emitter.on('message', (conversation) => send({ type: 'event', event: 'message', payload: conversation }));
+emitter.on('contact', (contact) => send({ type: 'event', event: 'contact', payload: contact }));
+emitter.on('contacts:updated', (payload) => send({ type: 'event', event: 'contacts:updated', payload }));
+emitter.on('profile:updated', (payload) => send({ type: 'event', event: 'profile:updated', payload }));
+emitter.on('active-target', (target) => send({ type: 'event', event: 'active-target', payload: target }));
+emitter.on('log', (line) => send({ type: 'event', event: 'log', payload: line }));
 
 // Só atende pedidos depois que o banco estiver pronto. Antes, um F5 logo após subir
 // o worker podia chegar antes das tabelas existirem e a tela ficava vazia.
 process.on('message', (message) => {
+  if (message.type === 'shutdown') { lifecycle.shutdown(); return; }
+  if (lifecycle.stopping) return;
   if (message.type === 'identity-result') {
     const request = pending.get(message.id);
     if (!request) return;
     pending.delete(message.id);
     clearTimeout(request.timer);
-    if (message.error) request.reject(new Error(message.error));
+    if (message.error) request.reject(Object.assign(new Error(message.error), { code: message.code }));
     else request.resolve(message.number);
     return;
   }
   db.ready.then(
-    () => handle(message),
+    () => { if (!lifecycle.stopping) return handle(message); },
     (error) => reply(message.id, null, error)
   );
 });
 
-db.ready.then(() => bot.startBotWithRetry(emitter)).catch((error) => {
-  process.send?.({ type: 'event', event: 'error', payload: error.message });
-  process.exitCode = 1;
+db.ready.then(() => { if (!lifecycle.stopping) return bot.startBotWithRetry(emitter); }).catch((error) => {
+  send({ type: 'event', event: 'error', payload: error.message });
+  lifecycle.shutdown(1);
 });

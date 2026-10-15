@@ -14,6 +14,7 @@ const { parseContactCsv, decodeContactCsv } = require('./contact-import');
 const BotManager = require('./bot-manager');
 const rbac = require('./rbac');
 const authorization = require('./authorization');
+const { dashboardActivity } = require('./dashboard-data');
 
 const app = express();
 const server = http.createServer(app);
@@ -35,7 +36,8 @@ const sessionMiddleware = session({
 const io = new Server(server, {
   cors: allowedOrigins.length ? { origin: allowedOrigins, credentials: true } : undefined,
 });
-const STORAGE_DIR = process.env.STORAGE_DIR || __dirname;
+const { resolveStorageDir, reportStorage } = require('./storage-path');
+const STORAGE_DIR = resolveStorageDir();
 const bot = new BotManager({ storageDir: STORAGE_DIR });
 bot.verifyIdentity = (chipId, number) => require('./chip-identity').bindIdentity(db, chipId, number);
 const upload = multer({
@@ -94,7 +96,7 @@ async function getUserChips(userId) {
   for (const chip of chips) {
     if (rbac.departmentAllowed(access, chip.department_id)) { visible.push(chip); continue; }
     if (!rbac.can(access, 'atendimento.visualizar') && !rbac.can(access, 'contatos.visualizar')) continue;
-    const state = await requestChip(chip, 'state');
+    const state = await requestChip(chip, 'state', { metadataOnly: true });
     const scoped = rbac.can(access, 'contatos.visualizar') ? { ...access, permissions: [...access.permissions, 'atendimento.visualizar_todos'] } : access;
     if (Object.values(state.conversations || {}).some((conversation) => rbac.conversationAllowed(scoped, conversation, chip))) visible.push(chip);
   }
@@ -132,7 +134,7 @@ async function broadcastAccount(accountId, event, payload) {
       if (event === 'conversation:deleted' && !rbac.conversationAllowed(access, payload.conversation || {}, chip)) continue;
       if (event === 'active-target' && !access.owner) continue;
       if (event === 'log' && !access.owner) continue;
-      if (event === 'contact') { if (rbac.can(access, 'contatos.visualizar')) socket.emit('contacts:updated', { chipId: payload?.chipId }); continue; }
+      if (event === 'contact') { if (rbac.can(access, 'contatos.visualizar')) socket.emit('contacts:updated', { chipId: payload?.chipId, contactChanged: true }); continue; }
       if (event === 'contacts:updated' && !rbac.can(access, 'contatos.visualizar')) continue;
       if (event === 'profile:updated' && !access.owner) continue;
       if (['status', 'chip:status'].includes(event) && !rbac.can(access, 'atendimento.visualizar') && !rbac.can(access, 'chips.visualizar') && !rbac.can(access, 'contatos.visualizar')) continue;
@@ -937,7 +939,8 @@ app.get('/api/chips', async (req, res) => {
       const entry = bot.workers.get(chip.id);
       const alive = bot.isAlive(entry);
       return { ...chip, number: chip.identity_verified ? chip.number : null, workerRunning: alive,
-        _connected: alive && !!entry.status?.connected, _qr: alive ? entry.status?.qr : null, _error: alive ? entry.status?.error : null };
+        _connected: alive && !!entry.status?.connected, _qr: alive ? entry.status?.qr : null, _error: alive ? entry.status?.error : null,
+        _historySync: alive ? entry.status?.historySync : null };
     });
     res.json({ chips: chipsWithStatus });
   } catch (err) {
@@ -1038,7 +1041,7 @@ app.put('/api/chips/:id/department', async (req, res) => {
     const entry = bot.workers.get(chip.id);
     if (entry?.chip) entry.chip.name = chip.name;
     if (departmentChanged) {
-      bot.stopChip(chip.id);
+      await bot.stopChip(chip.id);
       try { bot.ensureWorker(chip); } catch (error) {
         console.warn('[CHIPS] Nao foi possivel atualizar o departamento do worker:', error.message);
       }
@@ -1054,7 +1057,7 @@ app.delete('/api/chips/:id', async (req, res) => {
     const user = await getSessionUser(req);
     const chip = await db.get('SELECT * FROM chips WHERE id = ? AND user_id = ?', [req.params.id, user.account_id]);
     if (!chip) return res.status(404).json({ error: 'Chip não encontrado.' });
-    bot.stopChip(chip.id);
+    await bot.stopChip(chip.id);
     await db.run('DELETE FROM chips WHERE id = ?', [chip.id]);
     if (chip.is_primary) {
       const next = await db.get('SELECT * FROM chips WHERE user_id = ? ORDER BY created_at ASC LIMIT 1', [user.account_id]);
@@ -1698,18 +1701,27 @@ app.put('/api/contacts/:number/variables', async (req, res) => {
 
 // ---------- Dashboard Stats ----------
 async function dashboardStats(req) {
+    const days = Number(req.query.days || 7);
+    if (![7, 14, 30].includes(days)) throw Object.assign(new Error('Escolha um período de 7, 14 ou 30 dias.'), { statusCode: 400 });
     const access = { ...req.access, permissions: [...req.access.permissions, 'atendimento.visualizar_todos'] };
     const chips = (await db.all('SELECT * FROM chips WHERE user_id = ?', [access.accountId]));
+    const chipId = String(req.query.chipId || '');
+    if (chipId && !chips.some(chip => String(chip.id) === chipId)) throw Object.assign(new Error('Chip não encontrado.'), { statusCode: 404 });
     const conversations = [], contacts = new Set();
+    const channels = [];
     for (const chip of chips) {
       const state = await requestChip(chip, 'state');
       const visible = Object.values(state.conversations || {}).filter((conversation) => rbac.conversationAllowed(access, conversation, chip));
+      const activity = dashboardActivity(visible, days);
+      channels.push({ id: chip.id, name: chip.name || `Chip ${chip.id}`, connected: !!state.status?.connected,
+        messages: activity.received + activity.sent });
+      if (chipId && String(chip.id) !== chipId) continue;
       conversations.push(...visible);
       visible.forEach((conversation) => contacts.add(`${chip.id}:${conversation.number}`));
     }
     const opportunities = (await store.getOpportunities()).filter((row) => rbac.recordAllowed(req.access, row, 'opportunities'));
     const won = opportunities.filter((row) => row.status === 'won');
-    return { open: conversations.filter((row) => !row.isFinalized).length, finalized: conversations.filter((row) => row.isFinalized).length,
+    return { ...dashboardActivity(conversations, days), channels, updatedAt: new Date().toISOString(),
       contacts: contacts.size, messages: conversations.reduce((sum, row) => sum + row.messages.length, 0), opportunities: opportunities.length,
       wonOpportunities: won.length, revenue: won.reduce((sum, row) => sum + Number(row.value || 0), 0), conversionRate: opportunities.length ? Number((won.length / opportunities.length * 100).toFixed(1)) : 0 };
 }
@@ -1722,7 +1734,9 @@ app.get('/api/dashboard/export', async (req, res) => {
     const stats = await dashboardStats(req);
     await rbac.audit(req.access, 'reports.export', null, {}, stats);
     res.setHeader('Content-Disposition', 'attachment; filename=relatorio-bot-wap.csv');
-    res.type('text/csv').send('\uFEFFIndicador;Valor\r\n' + Object.entries(stats).map(([key, value]) => `${key};${value}`).join('\r\n'));
+    const summary = Object.entries(stats).filter(([, value]) => typeof value === 'number');
+    const daily = ['Data;Recebidas;Enviadas', ...stats.daily.map(row => `${row.date};${row.received};${row.sent}`)];
+    res.type('text/csv').send('\uFEFFIndicador;Valor\r\n' + summary.map(([key, value]) => `${key};${value}`).join('\r\n') + '\r\n\r\n' + daily.join('\r\n'));
   } catch (error) { res.status(error.statusCode || 500).json({ error: error.message }); }
 });
 
@@ -1775,6 +1789,7 @@ bot.on('event', ({ userId, chipId, chipNumber, event, payload }) => {
 // ---------- Start ----------
 const PORT = process.env.PORT || 3000;
 if (require.main === module) db.ready.then(async () => {
+  reportStorage();
   server.listen(PORT, () => {
     console.log(`🖥️  Servidor rodando na porta ${PORT}`);
   });
