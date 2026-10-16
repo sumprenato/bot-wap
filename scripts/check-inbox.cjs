@@ -391,6 +391,7 @@ async function main() {
     assert.match(await page.locator('#convoList').innerText(), /98888-1234/);
     console.log('PASS: unsaved LID contacts show their phone in the list, header, details and search');
     await page.locator('#conversationSearch').fill('');
+    await page.waitForFunction(() => document.getElementById('convoCount')?.textContent === '2');
     assert.equal((await page.locator('#convoList').innerText()).includes('Agenda sem conversa'), false);
     assert.equal(await page.locator('#convoCount').innerText(), '2');
     state.status.contactsSync = { syncing: true, verified: false, stage: 'loading', error: '' };
@@ -456,8 +457,41 @@ async function main() {
     await page.locator('#composerInput').pressSequentially('Envio com cinco mil mensagens');
     const typingMs = Date.now() - started;
     assert.equal(await page.evaluate(() => window.historyTypingMutations), 0, 'typing must not redraw or reformat message history');
+    // Hold an old poll response while a newer receipt arrives over the socket.
+    let releaseSnapshot, snapshotReady;
+    const snapshotGate = new Promise(resolve => { releaseSnapshot = resolve; });
+    const snapshotStarted = new Promise(resolve => { snapshotReady = resolve; });
+    const staleSnapshot = async route => {
+      const response = await route.fetch();
+      const body = await response.text();
+      snapshotReady();
+      await snapshotGate;
+      await route.fulfill({ response, body });
+    };
+    const stateRoute = /\/api\/state(?:\?|$)/;
+    await page.route(stateRoute, staleSnapshot);
+    await page.evaluate(() => {
+      const log = document.querySelector('.react-messages').parentElement;
+      log.scrollTop = 100;
+      window.receiptScrollTop = log.scrollTop;
+      window.receiptScrollCalls = 0;
+      const original = log.scrollTo.bind(log);
+      log.scrollTo = (...args) => { window.receiptScrollCalls++; return original(...args); };
+      window.dispatchEvent(new Event('online'));
+    });
+    await snapshotStarted;
     io.emit('message', { ...conversation, partialMessages: true, messages: [{ ...conversation.messages[4999], deliveryStatus: 4 }] });
     await page.locator('[data-message-id="14999"] [aria-label="Visualizado"]').waitFor();
+    const snapshotFinished = page.waitForResponse(response => new URL(response.url()).pathname === '/api/state');
+    releaseSnapshot();
+    await snapshotFinished;
+    await page.unroute(stateRoute, staleSnapshot);
+    // A later poll also carries an older status in this mock backend.
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.waitForTimeout(250);
+    await page.locator('[data-message-id="14999"] [aria-label="Visualizado"]').waitFor();
+    assert.equal(await page.evaluate(() => window.receiptScrollCalls), 0, 'receipts and polling must not scroll the history');
+    assert.equal(await page.evaluate(() => document.querySelector('.react-messages').parentElement.scrollTop), await page.evaluate(() => window.receiptScrollTop));
     assert.equal(await page.locator('.message-bubble').count(), 100);
     await page.locator('#sendBtn').click();
     await page.locator('.bubble-text').filter({ hasText: 'Envio com cinco mil mensagens' }).waitFor();

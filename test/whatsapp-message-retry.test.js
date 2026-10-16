@@ -17,6 +17,7 @@ test('persistent retrieval resolves LID aliases and preserves media and cryptogr
   const retry = createMessageRetryStore({
     store: { resolveConversationNumber: async number => number === '123' ? '5511999999999' : number },
     db: { get: async (sql, params) => {
+      if (sql.includes('whatsapp_retry_messages')) return undefined;
       queries.push({ sql, params });
       return params[0] === '5511999999999' && params[1] === 'audio' ? { whatsapp_payload: serializeMessage({ message }) } : undefined;
     } },

@@ -46,6 +46,7 @@ test('QR-verified history is persistent, deduplicated, preserves dates and newer
   const load = Module._load;
   Module._load = function(name, ...args) {
     if(name === '@whiskeysockets/baileys') return {
+      generateMessageIDV2: () => require('node:crypto').randomUUID(),
       useMultiFileAuthState: async () => ({ state: { creds: {}, keys: { get: async()=>({}), set: async()=>{} } }, saveCreds: async()=>{} }),
       downloadMediaMessage: async()=>{ throw new Error('Historical attachment expired'); },
       default: config => {
@@ -85,9 +86,15 @@ test('QR-verified history is persistent, deduplicated, preserves dates and newer
   assert.equal((await db.get('SELECT COUNT(*) AS n FROM messages')).n,1);
 
   await socket.emit('messages.upsert',{ type:'notify', messages:[message('live',now,{text:'Mensagem nova'})] });
+  const flowOutbox = await db.all('SELECT * FROM flow_outbox');
+  assert.equal(flowOutbox.length,1,'only a new live incoming message creates an automation event');
+  assert.equal(JSON.parse(flowOutbox[0].payload).id,'live');
+  assert.equal(JSON.parse(flowOutbox[0].payload).newContact,false,'historically known contacts must not be reported as new');
+  await socket.emit('messages.upsert',{ type:'notify', messages:[message('live',now,{text:'Mensagem nova'})] });
+  assert.equal((await db.get('SELECT COUNT(*) AS n FROM flow_outbox')).n,1,'duplicate messages cannot duplicate durable events');
   const history=[
     message('old',now-HISTORY_WINDOW_MS-86400000),
-    message('historical-send',now-3600000,{fromMe:true,text:'!assumir 5511888880000'}),
+    { ...message('historical-send',now-3600000,{fromMe:true,text:'!assumir 5511888880000'}), status: 2 },
     message('historical-in',now-2*86400000),
     message('media',now-1800000,{content:{imageMessage:{caption:'Foto antiga',mimetype:'image/jpeg'}}}),
     message('protocol',now-1800000,{number:'5511988880002',content:{protocolMessage:{type:0}}}),
@@ -99,6 +106,11 @@ test('QR-verified history is persistent, deduplicated, preserves dates and newer
   const imported=await db.get("SELECT * FROM messages WHERE whatsapp_msg_id='historical-send'");
   assert.equal(imported.at,new Date(now-3600000).toISOString());
   assert.equal(imported.from_role,'admin');
+  assert.equal((await store.getConversation('5511988880001')).messages.find(item => item.whatsappId === 'historical-send').deliveryStatus, 2);
+  const readHistory = { ...history[1], status: 4 };
+  await socket.emit('messaging-history.set', { messages: [readHistory] });
+  await socket.emit('messaging-history.set', { messages: [history[1]] });
+  assert.equal((await store.getConversation('5511988880001')).messages.find(item => item.whatsappId === 'historical-send').deliveryStatus, 4, 'duplicate history updates read receipts without regressing or duplicating messages');
   const preview=await store.getConversation('5511988880001');
   assert.equal(preview.lastMessage,'Mensagem nova');
   assert.equal(preview.messages[0].whatsappId,'historical-in');
@@ -107,6 +119,7 @@ test('QR-verified history is persistent, deduplicated, preserves dates and newer
   assert.equal(media.text,'Foto antiga');
   assert.ok(media.whatsapp_payload);
   assert.equal(sends.length,0);
+  assert.equal((await db.get('SELECT COUNT(*) AS n FROM flow_outbox')).n,1,'history imports never trigger automations');
   assert.equal(bot.getActiveTarget(),null);
 
   await socket.emit('messages.upsert',{type:'append',messages:[message('offline-in',now-120000),message('offline-send',now-60000,{fromMe:true})]});

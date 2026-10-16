@@ -179,7 +179,7 @@ function ConversationList({ ctx }) {
 function Messages({ ctx }) {
   const ref = useRef(null),
     nearBottom = useRef(true),
-    previous = useRef({ number: null, count: 0 }),
+    previous = useRef({ key: null, lastId: null }),
     messages = selected(ctx).messages || [];
   const channelKey = `${ctx.data.state.chipId}:${ctx.selected}`;
   const [historyWindow, setWindow] = useState({ key: channelKey, count: 100 });
@@ -198,6 +198,18 @@ function Messages({ ctx }) {
     log.addEventListener("scroll", track, { passive: true });
     return () => log.removeEventListener("scroll", track);
   }, [ctx.selected]);
+  useEffect(() => {
+    const content = ref.current, log = content?.parentElement;
+    if (!log || !window.ResizeObserver) return;
+    // Images, audio metadata and composer changes can resize the history after
+    // its initial scroll. Follow the bottom only while the reader is there.
+    const observer = new ResizeObserver(() => {
+      if (nearBottom.current && log.scrollHeight - log.scrollTop - log.clientHeight > 1) log.scrollTop = log.scrollHeight;
+    });
+    observer.observe(content);
+    observer.observe(log);
+    return () => observer.disconnect();
+  }, [channelKey]);
   useLayoutEffect(() => {
     const log = ref.current?.parentElement;
     if (!log) return;
@@ -207,8 +219,11 @@ function Messages({ ctx }) {
       scrollAnchor.current = null;
       return;
     }
-    const switched = previous.current.number !== ctx.selected;
-    const added = previous.current.count !== messages.length;
+    const switched = previous.current.key !== channelKey;
+    if (switched) nearBottom.current = true;
+    const last = messages.at(-1);
+    const lastId = last?.id ?? last?.whatsappId ?? last?.at;
+    const added = lastId != null && previous.current.lastId !== lastId;
     if (switched || (added && nearBottom.current))
       log.scrollTo({
         top: log.scrollHeight,
@@ -217,8 +232,8 @@ function Messages({ ctx }) {
             ? "instant"
             : "smooth",
       });
-    previous.current = { number: ctx.selected, count: messages.length };
-  }, [ctx.selected, messages, count]);
+    previous.current = { key: channelKey, lastId };
+  }, [channelKey, messages, count]);
   if (!ctx.selected)
     return (
       <div className="empty-state">
@@ -371,7 +386,7 @@ function ConversationActions({ ctx }) {
     ["assignBtn", "user", "Atribuir responsável"],
     ["tagsBtn", "tag", "Atribuir tags"],
     ["transferConversationBtn", "transfer", "Transferência"],
-    ["finalizeBtn", "check", item.isFinalized ? "Reabrir atendimento" : "Finalizar atendimento"],
+    ["finalizeBtn", "check", item.isFinalized ? "Reabrir atendimento" : item.flowStopped ? "Reativar automação" : "Finalizar atendimento"],
     ["blockBtn", "block", item.blocked ? "Desbloquear contato" : "Bloquear contato"],
     ["clearBtn", "trash", "Limpar histórico"],
     ["deleteBtn", "trash", "Apagar conversa"],
@@ -497,18 +512,20 @@ export function inboxActions(ctx) {
       ),
     ),
     finalizeBtn: run("finalizeBtn", async () => {
-      const label = item.isFinalized ? "Reabrir" : "Finalizar";
+      const reopening = item.isFinalized || item.flowStopped;
+      const label = item.isFinalized ? "Reabrir" : item.flowStopped ? "Reativar automação" : "Finalizar";
+      const reactivating = item.flowStopped && !item.isFinalized;
       if (
         await ctx.confirm({
-          title: label + " conversa",
-          body: `${label} a conversa com ${name(ctx, ctx.selected, item)}?`,
+          title: reactivating ? "Reativar automação" : label + " conversa",
+          body: reactivating ? "A automação voltará a responder quando a conversa estiver sem responsável." : `${label} a conversa com ${name(ctx, ctx.selected, item)}?`,
           okText: label,
         })
       )
         adopt(
           ctx,
           await api(
-            `/api/conversation/${ctx.selected}/${item.isFinalized ? "reopen" : "finalize"}`,
+            `/api/conversation/${ctx.selected}/${reopening ? "reopen" : "finalize"}`,
             "POST",
           ),
         );
@@ -695,7 +712,7 @@ export function inboxSlot(ctx, id, node) {
   if (id === "chatActions") return <ConversationActions ctx={ctx} />;
   if (id === 'composerSignature') return ctx.selected && ctx.preferences.signature ? `Assinatura: ${ctx.data.state.user?.displayName || ctx.data.state.user?.username || ''}` : null;
   if (id === "filePreview") return <AttachmentPreview ctx={ctx} />;
-  if (id === "chatStatus") return ctx.selected ? (item.isFinalized ? "Finalizado" : item.blocked ? "Bloqueado" : ctx.selected === ctx.data.state.activeTarget ? "Atendimento humano" : "Atendimento automático") : null;
+  if (id === "chatStatus") return ctx.selected ? (item.isFinalized ? "Finalizado" : item.blocked ? "Bloqueado" : item.assignedUserId || ctx.selected === ctx.data.state.activeTarget ? "Atendimento humano" : item.flowStopped ? "Automação interrompida" : "Atendimento automático") : null;
   if (id === "chatDepartment") {
     const department = ctx.data.departments.find((entry) => String(entry.id) === String(item.departmentId));
     return ctx.selected && department ? <span className="chat-department-pill"><Icon name="department" size={14} />{department.name}</span> : null;
@@ -718,7 +735,7 @@ export function inboxSlot(ctx, id, node) {
     return ctx.selected === ctx.data.state.activeTarget
       ? "conversa assumida"
       : "assumir conversa";
-  if (id === "finalizeBtn") return item.isFinalized ? "reabrir" : "finalizar";
+  if (id === "finalizeBtn") return item.isFinalized ? "reabrir" : item.flowStopped ? "reativar automação" : "finalizar";
   if (id === "blockBtn") return item.blocked ? "desbloquear" : "bloquear";
   if (id === "tagsBtn") return "tags";
   if (id === "clearBtn") return "limpar";

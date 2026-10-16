@@ -1,6 +1,27 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { dashboardActivity } = require('../dashboard-data');
+const { dashboardActivity, dashboardPeriod } = require('../dashboard-data');
+
+test('custom periods include both boundary days in Brasília and validate dates', () => {
+  const now = new Date('2026-10-15T15:00:00Z');
+  const period = dashboardPeriod({ startDate: '2026-09-30', endDate: '2026-10-01' }, now);
+  const activity = dashboardActivity([{ messages: [
+    { at: '2026-09-30T02:59:59Z', from: 'client' },
+    { at: '2026-09-30T03:00:00Z', from: 'client' },
+    { at: '2026-10-02T02:59:59Z', from: 'admin' },
+    { at: '2026-10-02T03:00:00Z', from: 'admin' },
+  ] }], period, now);
+  assert.equal(activity.days, 2);
+  assert.equal(activity.received, 1); assert.equal(activity.sent, 1);
+  assert.deepEqual(activity.daily.map(row => row.date), ['2026-09-30', '2026-10-01']);
+  assert.equal(dashboardPeriod({ startDate: '2024-02-29', endDate: '2024-02-29' }).days, 1);
+  for (const query of [
+    { startDate: '2026-02-29', endDate: '2026-03-01' },
+    { startDate: '2026-10-15' },
+    { startDate: '2026-10-15', endDate: '2026-10-14' },
+    { startDate: '2000-01-01', endDate: '2026-10-15' },
+  ]) assert.throws(() => dashboardPeriod(query), error => error.statusCode === 400);
+});
 
 test('dashboard buckets messages in Brasília, includes empty days and excludes out-of-period or invalid timestamps', () => {
   const now = new Date('2026-10-14T15:00:00Z');

@@ -24,6 +24,7 @@ async function harness(t, options = {}) {
   delete require.cache[require.resolve('../bot')];
   Module._load = function (name, ...args) {
     if (name === '@whiskeysockets/baileys') return {
+      generateMessageIDV2: () => require('node:crypto').randomUUID(),
       DisconnectReason: reasons,
       useMultiFileAuthState: async () => ({ state: { creds: { registered: fs.existsSync(credentials) }, keys: { get: async () => ({}), set: options.saveKeys || (async () => {}) } },
         saveCreds: async () => { saves.push('start'); await options.saveCreds?.(); saves.push('done'); } }),

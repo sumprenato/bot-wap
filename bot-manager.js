@@ -72,6 +72,16 @@ class BotManager extends EventEmitter {
 
     child.on('message', async (message) => {
       if (entry.intentional || this.workers.get(chipId) !== entry) return;
+      if (message.type === 'flow-authorize') {
+        try {
+          if (!this.authorizeFlow) throw Object.assign(new Error('Verificação do fluxo indisponível.'),{code:'FLOW_STOPPED'});
+          await this.authorizeFlow(chip.user_id,chipId,message.runId,message.number);
+          if (!entry.intentional && child.connected) child.send({type:'flow-authorize-result',id:message.id});
+        } catch (error) {
+          if (!entry.intentional && child.connected) child.send({type:'flow-authorize-result',id:message.id,error:error.message,code:error.code || 'FLOW_STOPPED'});
+        }
+        return;
+      }
       if (message.type === 'identity') {
         try {
           if (!this.verifyIdentity) throw new Error('Verificação da conta indisponível.');
@@ -90,7 +100,7 @@ class BotManager extends EventEmitter {
         if (!request) return;
         entry.pending.delete(message.id);
         clearTimeout(request.timer);
-        if (message.error) request.reject(new Error(message.error));
+        if (message.error) request.reject(Object.assign(new Error(message.error), { code: message.errorCode, deliveryAttempted: message.deliveryAttempted }));
         else request.resolve(message.result);
         return;
       }

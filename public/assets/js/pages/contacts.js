@@ -169,7 +169,7 @@
       isInternalWhatsAppId(contact.number, contact) ? '' : contact.number,
       (contact.tags || []).join(', '),
     ])];
-    downloadCsv(rows, 'contatos-bot-wap.csv');
+    downloadCsv(rows, 'contatos-convelya.csv');
   });
 
   core.ContactsPage = { render: renderContactsTable };

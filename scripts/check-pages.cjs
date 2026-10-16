@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
+const ExcelJS = require('exceljs');
 
 const tempRoot = path.resolve(__dirname, "../.tmp");
 fs.mkdirSync(tempRoot, { recursive: true });
@@ -12,7 +13,7 @@ process.env.ADMIN_PASSWORD = "pages-test-password";
 process.env.ADMIN_NUMBER = "5511999999999";
 delete process.env.DATABASE_URL;
 delete process.env.DATABASE_PRIVATE_URL;
-const { server, io, bot, db } = require("../server");
+const { server, io, bot, db, flowService } = require("../server");
 const store = require("../store");
 
 async function main() {
@@ -167,14 +168,16 @@ async function main() {
       })
     ).flow;
     const testChip = (await api('/api/chips', 'POST', { name: '<b>Chip teste</b>', departmentId: department.id })).chip;
+    const flowDefinition = require('../flows/schema').empty();
+    flowDefinition.nodes.push({id:'end',type:'flowBlock',position:{x:440,y:220},data:{kind:'stop',label:'Encerrar',config:{reason:'Fim'}}});
+    flowDefinition.edges.push({id:'start-end',source:'start',target:'end',sourceHandle:'next',type:'default'});
     const flowData = {
       ...flow,
-      active: true,
-      nodes: [{ id: "start", type: "message", text: "Ola" }],
-      edges: [{ source: "start", target: "end" }],
+      definition: flowDefinition,
       trigger_chips: [String(testChip.id)],
     };
-    await api("/api/flows/" + flow.id, "PUT", flowData);
+    const savedFlow=(await api("/api/flows/" + flow.id, "PUT", flowData)).flow;
+    await api(`/api/flows/${flow.id}/publish`,'POST',{revision:savedFlow.revision});
     const webhook = (
       await api("/api/webhooks", "POST", {
         name: "Webhook teste",
@@ -452,14 +455,13 @@ async function main() {
     console.log("PASS: old route, funnel movement and closed opportunities");
 
     await page.goto(base + "/fluxos");
-    await page.locator('.flow-card .record-actions-trigger').click();
-    await page.locator(".flow-edit").click();
-    await page.locator("#flowName").fill("Fluxo revisado");
-    await page.locator("#flowForm [type=submit]").click();
-    await page.locator("#flowModal").waitFor({ state: "hidden" });
+    await page.getByRole('button',{name:'Editar Fluxo teste',exact:true}).click();
+    await page.getByLabel('Nome do fluxo',{exact:true}).fill('Fluxo revisado');
+    await page.locator('.fb-editor-top').getByRole('button',{name:'Salvar',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('.fb-title small')?.textContent.includes('Salvo'));
     const updatedFlow = (await api("/api/flows")).flows[0];
-    assert.deepEqual(updatedFlow.nodes, flowData.nodes);
-    assert.deepEqual(updatedFlow.edges, flowData.edges);
+    assert.deepEqual(updatedFlow.nodes, flowDefinition.nodes);
+    assert.deepEqual(updatedFlow.edges, flowDefinition.edges);
     assert.deepEqual(updatedFlow.trigger_chips, flowData.trigger_chips);
     assert.equal(!!updatedFlow.active, true);
     assert.equal(await page.locator(".flow-card b").count(), 0);
@@ -505,7 +507,7 @@ async function main() {
     const downloadPromise = page.waitForEvent("download");
     await page.locator("#exportContactsBtn").click();
     const download = await downloadPromise;
-    assert.equal(download.suggestedFilename(), "contatos-bot-wap.csv");
+    assert.equal(download.suggestedFilename(), "contatos-convelya.xlsx");
     await page.locator("#contactsTable [data-contact-number]").click();
     await page.waitForURL("**/atendimento");
     assert.match(
@@ -578,14 +580,20 @@ async function main() {
     await page.locator("#contactsPageSearch").fill("Contato revisado");
     const exportedFile = page.waitForEvent("download");
     await page.locator("#exportContactsBtn").click();
-    const csv = await (await exportedFile).path();
+    const xlsx = await (await exportedFile).path();
+    const book = new ExcelJS.Workbook(); await book.xlsx.readFile(xlsx);
+    const contactsSheet = book.getWorksheet('Contatos');
+    assert.equal(contactsSheet.rowCount, 2, 'export respects the contact search');
+    assert.equal(contactsSheet.getCell('B2').value, '5511977776666', 'phones remain text in Excel');
+    const csvRows = [];
+    contactsSheet.eachRow(row => csvRows.push(row.values.slice(1).map(value => '"' + String(value || '').replace(/"/g, '""') + '"').join(';')));
     await page.locator("#importContactsBtn").click();
     await page
       .locator("#importContactsFile")
       .setInputFiles({
         name: "reimportar.csv",
         mimeType: "text/csv",
-        buffer: fs.readFileSync(csv),
+        buffer: Buffer.from(csvRows.join('\r\n')),
       });
     await page.locator("#submitContactsImport").click();
     await page
@@ -608,7 +616,7 @@ async function main() {
     await page.locator("#importContactsError").waitFor({ state: "visible" });
     assert.equal(await page.locator("#submitContactsImport").isEnabled(), true);
     console.log(
-      "PASS: CSV upload persists after reload, exported CSV reimports without duplicates and bad files can be retried",
+      "PASS: CSV upload persists, XLSX export preserves filtered contacts and phone text, converted CSV reimports without duplicates and bad files can be retried",
     );
 
     await page.goto(base + "/tags");
@@ -754,7 +762,7 @@ async function main() {
       .getByText("Mensagem com emoji 👍", { exact: true })
       .waitFor();
     assert.equal(await page.locator("#composerInput").inputValue(), "");
-    io.emit("message", {
+    const incomingAudioConversation = {
       number: "551188887777",
       name: "Cliente teste",
       messages: [
@@ -773,7 +781,10 @@ async function main() {
           at: new Date().toISOString(),
         },
       ],
-    });
+    };
+    mockState.conversations[incomingAudioConversation.number] = incomingAudioConversation;
+    io.emit("message", incomingAudioConversation);
+
     await page.locator(".react-audio-player").waitFor();
     assert.ok(
       (await page.locator(".react-audio-player").boundingBox()).width > 220,
@@ -894,19 +905,14 @@ async function main() {
     );
 
     await page.goto(base + "/fluxos");
-    await page.locator("#manageGlobalVarsBtn").click();
-    await page.locator("#newGlobalVarKey").fill("empresa");
-    await page.locator("#newGlobalVarValue").fill("Empresa teste");
-    await page.locator("#addGlobalVarBtn").click();
-    await page
-      .locator("#globalVarsList")
-      .getByText("Empresa teste", { exact: true })
-      .waitFor();
-    await page.locator(".global-var-delete").click();
-    await page
-      .locator("#globalVarsList")
-      .getByText("Nenhuma variável global cadastrada.", { exact: true })
-      .waitFor();
+    await page.getByRole('button',{name:'Variáveis Globais',exact:true}).click();
+    await page.getByLabel('Nome da variável',{exact:true}).fill('empresa');
+    await page.getByLabel('Valor padrão',{exact:true}).fill('Empresa teste');
+    await page.getByRole('button',{name:'Salvar variável',exact:true}).click();
+    await page.locator('.fb-variable-list').getByText(/Empresa teste/).waitFor();
+    await page.locator('.fb-variable-list').getByRole('button',{name:'Excluir',exact:true}).click();
+    await page.locator('#confirmOk').click();
+    await page.waitForFunction(()=>document.querySelectorAll('.fb-variable-list article').length===0);
     await page.goto(base + "/tags");
     await page.locator("#addTagBtn").click();
     await page.getByRole("button", { name: "Azul", exact: true }).click();
@@ -1033,6 +1039,7 @@ async function main() {
     console.log("PASS: remember-login switch, two-hour cookie and automatic expiry redirect");
     console.log("All page checks passed.");
   } finally {
+    await flowService.stop();
     if (browser) await browser.close();
     await new Promise((resolve) => io.close(resolve));
     await db.close();

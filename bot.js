@@ -2,6 +2,7 @@ require('dotenv').config();
 const {
   default: makeWASocket,
   useMultiFileAuthState,
+  generateMessageIDV2,
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
@@ -16,6 +17,7 @@ const { createContactSyncLog } = require('./whatsapp-sync-log');
 const { accountNumber, savedIdentity, identityError } = require('./chip-identity');
 const { disconnectInfo, createConnectionLog } = require('./whatsapp-connection');
 const { createMessageRetryStore } = require('./whatsapp-message-retry');
+const { createOutgoingSender } = require('./whatsapp-outgoing');
 const { HISTORY_DAYS, messageTime, recentMessages } = require('./whatsapp-history');
 const messageRetryStore = createMessageRetryStore({ db, store });
 
@@ -285,6 +287,7 @@ async function handleIncomingMessage(sock, msg, emitter) {
     return;
   }
   const conversationNumber = await store.registerConversationAliases(remoteNumber, phoneNumber);
+  const knownFlowContact = await db.get('SELECT number FROM contacts WHERE number IN (?, ?, ?) LIMIT 1', [conversationNumber, remoteNumber, phoneNumber || remoteNumber]);
   const savedContact = await store.saveContact({ number: phoneNumber || remoteNumber, jid: remoteJid });
   const contactName = savedContact?.name || '';
   if (savedContact) emitter.emit('contact', savedContact);
@@ -339,7 +342,7 @@ async function handleIncomingMessage(sock, msg, emitter) {
     return;
   }
 
-  await forwardToAdmin(conversationNumber, text, emitter, contactName, msg, mediaInfo);
+  await forwardToAdmin(conversationNumber, text, emitter, contactName, msg, mediaInfo, !knownFlowContact);
 }
 
 // Archive imports never execute admin commands, change the active conversation,
@@ -353,7 +356,13 @@ async function saveHistoricalMessage(msg, canSave) {
   const text = extractText(msg).trim(), info = getMediaInfo(msg);
   if ((!text && !info) || !canSave()) return null;
   const number = await store.registerConversationAliases(remoteNumber, phoneNumber);
-  if (await db.get('SELECT id FROM messages WHERE number = ? AND whatsapp_msg_id = ?', [number, msg.key.id])) return null;
+  if (await db.get('SELECT id FROM messages WHERE number = ? AND whatsapp_msg_id = ?', [number, msg.key.id])) {
+    if (msg.key.fromMe && Number.isInteger(msg.status) && canSave()) {
+      const updated = await store.updateMessageStatus(msg.key.id, msg.status);
+      if (updated && canSave()) emitterRef?.emit('message', updated);
+    }
+    return null;
+  }
   const contact = await store.saveContact({ number: phoneNumber || remoteNumber, jid: remoteJid, preserveActivity: true });
   let media = {};
   if (info) {
@@ -369,7 +378,7 @@ async function saveHistoricalMessage(msg, canSave) {
   jidMap[remoteNumber] = remoteJid;
   if (phoneNumber) jidMap[phoneNumber] = remoteJid;
   const details = { ...await incomingDetails(msg, number), at: new Date(messageTime(msg)).toISOString(), deferConversation: true };
-  await store.addMessage(number, msg.key.fromMe ? 'admin' : 'client', text || (info && !media.mediaUrl ? '[Anexo indisponível no histórico]' : ''), contact?.name || '', media, msg.key.id, undefined, details);
+  await store.addMessage(number, msg.key.fromMe ? 'admin' : 'client', text || (info && !media.mediaUrl ? '[Anexo indisponível no histórico]' : ''), contact?.name || '', media, msg.key.id, msg.status, details);
   return number;
 }
 
@@ -437,6 +446,7 @@ async function startBot(emitter) {
     cancelIdentity = acceptIdentity;
 
     const syncLog = createContactSyncLog(CHIP_ID);
+    let outgoing;
     const sock = makeWASocket({
       auth: authState,
       logger: syncLog.logger,
@@ -444,6 +454,7 @@ async function startBot(emitter) {
       connectTimeoutMs: 60000,
       syncFullHistory: true,
       shouldSyncHistoryMessage: () => true,
+      patchMessageBeforeSending: message => outgoing.patchMessageBeforeSending(message),
       getMessage: async (key) => {
         if (!(await identityReady) || generation !== socketGeneration || manualDisconnect) return undefined;
         try {
@@ -458,12 +469,12 @@ async function startBot(emitter) {
       },
     });
 
-    const sendMessage = sock.sendMessage.bind(sock);
-    sock.sendMessage = async (...args) => {
-      const sent = await sendMessage(...args);
-      if (generation === socketGeneration && !manualDisconnect) messageRetryStore.remember(sent);
-      return sent;
-    };
+    outgoing = createOutgoingSender({
+      send: sock.sendMessage.bind(sock), retryStore: messageRetryStore,
+      generateId: () => generateMessageIDV2(sock.user?.id),
+      isCurrent: () => generation === socketGeneration && !manualDisconnect && status.connected,
+    });
+    sock.sendMessage = outgoing.sendMessage;
 
     if (generation !== socketGeneration || manualDisconnect) {
       acceptIdentity(false);
@@ -473,6 +484,15 @@ async function startBot(emitter) {
 
     sockRef = sock;
     socketClosed = false;
+    // sendMessage returns PENDING after writing to the socket. Only the actual
+    // server acknowledgement confirms that WhatsApp accepted the message.
+    sock.ws?.on?.('CB:ack,class:message', async node => {
+      if (!node?.attrs?.id || !(await identityReady) || generation !== socketGeneration || manualDisconnect) return;
+      try {
+        const conversation = await store.updateMessageStatus(node.attrs.id, node.attrs.error ? 0 : 2);
+        if (conversation && generation === socketGeneration && !manualDisconnect) emitter.emit('message', conversation);
+      } catch (error) { console.warn('[RECEIPTS] Falha ao salvar confirmação do servidor:', error.message); }
+    });
     sock.ev.on('messaging-history.set', ({ messages = [], progress }) => enqueueHistory(messages, progress));
     sock.ev.on('messages.update', async (updates) => {
       if (!(await identityReady) || generation !== socketGeneration || manualDisconnect) return;
@@ -761,7 +781,7 @@ async function formatOutgoingText(text, displayName = '') {
 }
 
 // Mensagem vinda de um CLIENTE (qualquer numero que nao seja o admin)
-async function forwardToAdmin(senderNumber, text, emitter, contactName = '', msg = null, mediaInfo = null) {
+async function forwardToAdmin(senderNumber, text, emitter, contactName = '', msg = null, mediaInfo = null, newContact = false) {
   const current = await store.getConversation(senderNumber, true, { metadataOnly: true });
   if (current.blocked) {
     console.log(`[BLOCK] Mensagem ignorada para ${senderNumber} porque a conversa está bloqueada.`);
@@ -780,8 +800,19 @@ async function forwardToAdmin(senderNumber, text, emitter, contactName = '', msg
 
   const existing = msg?.key?.id && await db.get('SELECT id FROM messages WHERE whatsapp_msg_id = ? AND number = ?', [msg.key.id, current.number]);
   if (existing) return;
-  const conversation = await store.addMessage(senderNumber, 'client', text || (mediaInfo?.sticker && !media.type ? '[Figurinha indisponível]' : ''), contactName || current.name || '', media, msg?.key?.id || '', undefined, { ...await incomingDetails(msg, senderNumber), delta: true });
+  const details = { ...await incomingDetails(msg, senderNumber), delta: true };
+  const { conversation, event } = await db.transaction(async () => {
+    const conversation = await store.addMessage(senderNumber, 'client', text || (mediaInfo?.sticker && !media.type ? '[Figurinha indisponível]' : ''), contactName || current.name || '', media, msg?.key?.id || '', undefined, details);
+    let event;
+    if (msg?.key?.id) {
+      const count = await db.get("SELECT COUNT(*) AS n FROM messages WHERE number = ? AND from_role = 'client'", [conversation.number]);
+      event = { id: msg.key.id, type: 'message', number: conversation.number, text, firstMessage: Number(count?.n) === 1, newContact };
+      await db.run('INSERT INTO flow_outbox(id,payload,created_at) VALUES (?,?,?) ON CONFLICT(id) DO NOTHING', [event.id, JSON.stringify(event), new Date().toISOString()]);
+    }
+    return { conversation, event };
+  });
   emitter.emit('message', conversation);
+  if (event) emitter.emit('flow:incoming', event);
 }
 
 // ---------- API usada pela dashboard ----------
@@ -876,13 +907,19 @@ async function disconnectBot() {
   }
 }
 
-function assertConnected() {
+function sendReadiness() {
   if (!sockRef || !status.connected) {
-    throw new Error('O WhatsApp está desconectado no momento. Aguarde a reconexão ou escaneie o QR Code.');
+    return { ready: false, reason: 'disconnected', message: 'O WhatsApp está desconectado no momento. Aguarde a reconexão ou escaneie o QR Code.' };
   }
   if (directoryRef && !directoryRef.syncState.verified) {
-    throw new Error('Aguarde a sincronização e verificação dos contatos antes de enviar mensagens.');
+    return { ready: false, reason: 'contacts-sync', message: 'Aguarde a sincronização e verificação dos contatos antes de enviar mensagens.' };
   }
+  return { ready: true };
+}
+
+function assertConnected() {
+  const readiness = sendReadiness();
+  if (!readiness.ready) throw Object.assign(new Error(readiness.message), { code: 'WHATSAPP_NOT_READY', deliveryAttempted: false });
 }
 
 // Descobre para qual JID enviar. Ordem: mapa em memória -> JID salvo no banco
@@ -930,19 +967,19 @@ async function quotedMessage(number, replyTo) {
   return { options: { quoted: raw }, summary: quoteSummary(row) };
 }
 
-async function sendToClient(number, text, displayName = '', replyTo) {
+async function sendToClient(number, text, displayName = '', replyTo, beforeSend) {
   assertConnected();
   const clean = number.replace(/\D/g, '');
   const jid = await resolveClientJid(clean);
   const outgoingText = await formatOutgoingText(text, displayName);
   const quote = await quotedMessage(clean, replyTo);
   assertConnected();
-  const sent = await sockRef.sendMessage(jid, { text: outgoingText }, quote.options);
+  const sent = await sockRef.sendMessage(jid, { text: outgoingText }, quote.options, beforeSend);
   if (DEPARTMENT_ID) await store.setDefaultConversationDepartment(clean, DEPARTMENT_ID);
   return store.addMessage(clean, 'admin', outgoingText, '', {}, sent?.key?.id || '', sent?.status ?? 1, { raw: sent, replyTo: quote.summary, delta: true });
 }
 
-async function sendMediaToClient(number, media, displayName = '', replyTo) {
+async function sendMediaToClient(number, media, displayName = '', replyTo, beforeSend) {
   assertConnected();
   const clean = number.replace(/\D/g, '');
   const jid = await resolveClientJid(clean);
@@ -956,7 +993,7 @@ async function sendMediaToClient(number, media, displayName = '', replyTo) {
   if (media.type === 'audio') content.ptt = true;
   const quote = await quotedMessage(clean, replyTo);
   assertConnected();
-  const sent = await sockRef.sendMessage(jid, content, quote.options);
+  const sent = await sockRef.sendMessage(jid, content, quote.options, beforeSend);
 
   const storedCaption = media.caption ? content.caption : '';
   if (DEPARTMENT_ID) await store.setDefaultConversationDepartment(clean, DEPARTMENT_ID);
@@ -1017,6 +1054,7 @@ async function deleteMessages(number, ids, forEveryone = false) {
     for (const row of rows) {
       assertConnected();
       await sockRef.sendMessage(jid, { delete: row.raw?.key || { id: row.whatsapp_msg_id, remoteJid: jid, fromMe: true } });
+      await messageRetryStore.forget({ remoteJid: jid, id: row.whatsapp_msg_id });
       // Keep already completed deletions consistent if a later request fails.
       emitterRef?.emit('message', { ...await store.deleteMessages(number, [row.id]), mutation: 'delete' });
     }
@@ -1046,6 +1084,7 @@ module.exports = {
   getActiveTarget,
   setActiveTarget,
   getStatus,
+  sendReadiness,
   disconnectBot,
   stopBot,
   sendToClient,

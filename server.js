@@ -14,7 +14,8 @@ const { parseContactCsv, decodeContactCsv } = require('./contact-import');
 const BotManager = require('./bot-manager');
 const rbac = require('./rbac');
 const authorization = require('./authorization');
-const { dashboardActivity } = require('./dashboard-data');
+const { dashboardActivity, dashboardPeriod } = require('./dashboard-data');
+const { contactsWorkbook, dashboardWorkbook, sendWorkbook } = require('./excel-export');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,7 +40,9 @@ const io = new Server(server, {
 const { resolveStorageDir, reportStorage } = require('./storage-path');
 const STORAGE_DIR = resolveStorageDir();
 const bot = new BotManager({ storageDir: STORAGE_DIR });
+const flowService = new (require('./flows/service').FlowService)({ requestChip: (...args) => requestChip(...args), broadcast: (...args) => broadcastAccount(...args) });
 bot.verifyIdentity = (chipId, number) => require('./chip-identity').bindIdentity(db, chipId, number);
+bot.authorizeFlow = (...args) => flowService.authorizeSend(...args);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
@@ -165,6 +168,7 @@ async function getConversationChip(req, userId, { fallback = false } = {}) {
   return req.selectedChip;
 }
 
+app.use('/api/flows', express.json({ limit: '3mb' }));
 app.use(express.json());
 app.set('trust proxy', 1);
 app.use((req, res, next) => {
@@ -189,18 +193,18 @@ io.use((socket, next) => {
 // ---------- Middleware de Proteção ----------
 const DASHBOARD_HTML = path.join(__dirname, 'public', 'dashboard.html');
 const APP_PAGE_TITLES = {
-  inbox: 'Atendimento — Bot WAP',
-  overview: 'Dashboard — Bot WAP',
-  kanban: 'Funis — Bot WAP',
-  campaigns: 'Campanhas — Bot WAP',
-  flows: 'Fluxos — Bot WAP',
-  contacts: 'Contatos — Bot WAP',
-  webhooks: 'Webhooks — Bot WAP',
-  departments: 'Departamentos — Bot WAP',
-  tags: 'Tags e rótulos — Bot WAP',
-  chips: 'Meus chips — Bot WAP',
-  settings: 'Configurações — Bot WAP',
-  team: 'Equipe — Bot WAP',
+  inbox: 'Atendimento — Convelya',
+  overview: 'Dashboard — Convelya',
+  kanban: 'Funis — Convelya',
+  campaigns: 'Campanhas — Convelya',
+  flows: 'Fluxos — Convelya',
+  contacts: 'Contatos — Convelya',
+  webhooks: 'Webhooks — Convelya',
+  departments: 'Departamentos — Convelya',
+  tags: 'Tags e rótulos — Convelya',
+  chips: 'Meus chips — Convelya',
+  settings: 'Configurações — Convelya',
+  team: 'Equipe — Convelya',
 };
 
 function extractPageSection(html, page) {
@@ -293,7 +297,7 @@ function renderAppPage(page, access) {
     if (!retainedEditors.has(editor)) documentHtml = removeElementById(documentHtml, 'div', editor);
   }
 
-  documentHtml = documentHtml.replace(/<title>[^<]*<\/title>/, `<title>${APP_PAGE_TITLES[page] || 'Bot WAP'}</title>`);
+  documentHtml = documentHtml.replace(/<title>[^<]*<\/title>/, `<title>${APP_PAGE_TITLES[page] || 'Convelya'}</title>`);
   // Render the correct navigation before scripts load (including slow/F5 loads).
   documentHtml = documentHtml.replace('<body>', `<body data-page="${page}">`);
   if (page !== 'inbox') documentHtml = documentHtml.replace('<div class="app">', '<div class="app app--management">');
@@ -307,7 +311,7 @@ function renderAppPage(page, access) {
     tag = tag.replace('nav-item is-active', 'nav-item');
     return target === page ? tag.replace('class="nav-item"', 'class="nav-item is-active" aria-current="page"') : tag;
   });
-  const pageLabel = (APP_PAGE_TITLES[page] || 'Bot WAP').split(' — ')[0];
+  const pageLabel = (APP_PAGE_TITLES[page] || 'Convelya').split(' — ')[0];
   documentHtml = documentHtml.replace(/(<strong id="currentPageLabel">)[^<]*(<\/strong>)/, (_, start, end) => `${start}${pageLabel}${end}`);
   const pageStyles = {
     campaigns: '/assets/css/pages/campaigns.css',
@@ -691,11 +695,8 @@ app.get('/api/contacts/export', async (req, res) => {
     const search = String(req.query.search || '').toLocaleLowerCase('pt-BR');
     if (search) contacts = contacts.filter((contact) => `${contact.name} ${contact.number}`.toLocaleLowerCase('pt-BR').includes(search));
     if (req.query.tag) contacts = contacts.filter((contact) => contact.tags?.includes(req.query.tag));
-    const quote = (value) => '"' + String(value || '').replace(/"/g, '""') + '"';
-    const rows = [['Nome','Telefone','R\u00f3tulos'], ...contacts.map((contact) => [contact.name, contact.number, (contact.tags || []).join(', ')])];
     await rbac.audit(req.access, 'contacts.export', null, {}, { count: contacts.length });
-    res.setHeader('Content-Disposition', 'attachment; filename=contatos-bot-wap.csv');
-    res.type('text/csv').send('\uFEFF' + rows.map((row) => row.map(quote).join(';')).join('\r\n'));
+    await sendWorkbook(res, contactsWorkbook(contacts), 'contatos-convelya.xlsx');
   } catch (error) { res.status(error.statusCode || 500).json({ error: error.message }); }
 });
 
@@ -903,7 +904,10 @@ app.post('/api/assumir', async (req, res) => {
     }
     if (!chip) return res.json({ ok: true, activeTarget: null });
     const result = await bot.assume(chip, number || null);
-    if (number) await requestChip(chip, 'assign-conversation', { number, userId: user.id });
+    if (number) {
+      const assigned = await requestChip(chip, 'assign-conversation', { number, userId: user.id });
+      await flowService.stopConversationRuns(user.account_id, chip.id, assigned.conversation?.number || number);
+    }
     broadcastAccount(user.account_id, 'active-target', { chipId: chip.id, number: result.activeTarget });
     res.json({ ok: true, activeTarget: result.activeTarget });
   } catch (err) {
@@ -924,6 +928,7 @@ app.post('/api/conversation/:number/assign', async (req, res) => {
     const current = await requestChip(chip, 'get-conversation', { number: req.params.number });
     if (req.body.userId != null && (!target || target.accountId !== req.access.accountId || !rbac.departmentAllowed(target, current.departmentId || chip.department_id))) return res.status(403).json({ error: 'Responsável fora deste departamento ou conta.' });
     const result = await requestChip(chip, 'assign-conversation', { number: req.params.number, userId: target?.user.id || null });
+    if (target) await flowService.stopConversationRuns(req.access.accountId, chip.id, result.conversation?.number || req.params.number);
     await rbac.audit(req.access, 'conversation.assign', target?.user.id, { chipId: chip.id, number: req.params.number, assignedUserId: current.assignedUserId }, { assignedUserId: target?.user.id || null });
     await broadcastAccount(req.access.accountId, 'message', result.conversation);
     await authorizationChanged(req.access.accountId);
@@ -1441,10 +1446,17 @@ app.delete('/api/webhooks/:id', async (req, res) => {
 });
 
 // ---------- Kanban CRUD ----------
+require('./funnel-routes').register(app);
 app.get('/api/kanban', async (req, res) => {
   try {
     const [columns, opportunities] = await Promise.all([store.getKanbanColumns(), store.getOpportunities()]);
-    res.json({ columns, opportunities });
+    const visibleColumns = columns.filter(column => rbac.recordAllowed(req.access, column, 'kanban_columns'));
+    const allFunnels = await require('./funnel-store').list();
+    const funnels = allFunnels.filter(funnel => req.access.owner || visibleColumns.some(column => column.funnel_id === funnel.id) || (!columns.some(column => column.funnel_id === funnel.id) && Number(funnel.created_by) === req.access.user.id && rbac.recordAllowed(req.access, funnel, 'funnels')));
+    const visibleOpportunities = opportunities.filter(item => rbac.recordAllowed(req.access, item, 'opportunities'));
+    const responsibleIds = [...new Set(visibleOpportunities.map(item => item.assigned_user_id || item.created_by).filter(Boolean))];
+    const responsibles = responsibleIds.length ? await db.all(`SELECT id, display_name, username FROM users WHERE account_id = ? AND id IN (${responsibleIds.map(() => '?').join(',')})`, [req.access.accountId, ...responsibleIds]) : [];
+    res.json({ funnels: funnels.map(funnel => ({ ...funnel, canManage: req.access.owner || columns.filter(column => column.funnel_id === funnel.id).every(column => rbac.recordAllowed(req.access, column, 'kanban_columns')) })), columns, opportunities, responsibles });
   } catch (err) {
     res.status(err.statusCode || 500).json({ error: err.message });
   }
@@ -1452,9 +1464,10 @@ app.get('/api/kanban', async (req, res) => {
 
 app.post('/api/kanban/columns', async (req, res) => {
   try {
-    const { name } = req.body || {};
-    if (!name) return res.status(400).json({ error: 'Informe o nome da coluna.' });
-    const column = await store.createKanbanColumn(name);
+    const name = require('./funnel-routes').validName(req.body?.name);
+    const funnel = req.body?.funnel_id ? (await require('./funnel-routes').allowed(req.access, req.body.funnel_id, true)).funnel : await require('./funnel-store').defaultFunnel();
+    if (!req.body?.funnel_id) await require('./funnel-routes').allowed(req.access, funnel.id, true);
+    const column = await store.createKanbanColumn(name, funnel.id);
     res.status(201).json({ ok: true, column });
   } catch (err) {
     res.status(err.statusCode || 500).json({ error: err.message });
@@ -1558,52 +1571,8 @@ app.delete('/api/loss-reasons/:id', async (req, res) => {
   }
 });
 
-// ---------- Flows CRUD ----------
-app.get('/api/flows', async (req, res) => {
-  try {
-    res.json({ flows: await store.getFlows() });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ error: err.message });
-  }
-});
-
-app.post('/api/flows', async (req, res) => {
-  try {
-    const { name, description } = req.body || {};
-    if (!name) return res.status(400).json({ error: 'Informe o nome do fluxo.' });
-    const flow = await store.createFlow({ name, description });
-    res.status(201).json({ ok: true, flow });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ error: err.message });
-  }
-});
-
-app.put('/api/flows/:id', async (req, res) => {
-  try {
-    const flow = await store.updateFlow(req.params.id, req.body || {});
-    res.json({ ok: true, flow });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ error: err.message });
-  }
-});
-
-app.post('/api/flows/:id/duplicate', async (req, res) => {
-  try {
-    const flow = await store.duplicateFlow(req.params.id);
-    res.status(201).json({ ok: true, flow });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/flows/:id', async (req, res) => {
-  try {
-    await store.deleteFlow(req.params.id);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ error: err.message });
-  }
-});
+// ---------- Visual flow builder and execution ----------
+require('./flows/routes').register(app, flowService);
 
 // ---------- Global Variables ----------
 app.get('/api/global-variables', async (req, res) => {
@@ -1616,9 +1585,14 @@ app.get('/api/global-variables', async (req, res) => {
 
 app.post('/api/global-variables', async (req, res) => {
   try {
-    const { key, value } = req.body || {};
-    if (!key) return res.status(400).json({ error: 'Informe a chave.' });
-    const variable = await store.setGlobalVariable(key, value || '');
+    const { key, value, valueType = 'text' } = req.body || {};
+    if (!require('./flows/schema').safeKey(key) || key.includes('.')) return res.status(400).json({ error: 'Informe uma chave válida sem pontos.' });
+    if (!['text','number','boolean','date','json'].includes(valueType) || typeof value !== 'string' || value.length > 64000) return res.status(400).json({ error: 'Tipo ou valor de variável inválido.' });
+    if (valueType === 'json') {
+      try { JSON.parse(value); } catch { return res.status(400).json({error:'JSON inválido para a variável.'}); }
+    }
+    if (!require('./flows/schema').validVariableValue(valueType,require('./flows/schema').decodeVariable(value,valueType))) return res.status(400).json({error:'O valor não corresponde ao tipo da variável.'});
+    const variable = await store.setGlobalVariable(key, value, valueType);
     res.json({ ok: true, variable });
   } catch (err) {
     res.status(err.statusCode || 500).json({ error: err.message });
@@ -1701,8 +1675,8 @@ app.put('/api/contacts/:number/variables', async (req, res) => {
 
 // ---------- Dashboard Stats ----------
 async function dashboardStats(req) {
-    const days = Number(req.query.days || 7);
-    if (![7, 14, 30].includes(days)) throw Object.assign(new Error('Escolha um período de 7, 14 ou 30 dias.'), { statusCode: 400 });
+    const now = new Date();
+    const period = dashboardPeriod(req.query, now);
     const access = { ...req.access, permissions: [...req.access.permissions, 'atendimento.visualizar_todos'] };
     const chips = (await db.all('SELECT * FROM chips WHERE user_id = ?', [access.accountId]));
     const chipId = String(req.query.chipId || '');
@@ -1712,7 +1686,7 @@ async function dashboardStats(req) {
     for (const chip of chips) {
       const state = await requestChip(chip, 'state');
       const visible = Object.values(state.conversations || {}).filter((conversation) => rbac.conversationAllowed(access, conversation, chip));
-      const activity = dashboardActivity(visible, days);
+      const activity = dashboardActivity(visible, period, now);
       channels.push({ id: chip.id, name: chip.name || `Chip ${chip.id}`, connected: !!state.status?.connected,
         messages: activity.received + activity.sent });
       if (chipId && String(chip.id) !== chipId) continue;
@@ -1721,7 +1695,7 @@ async function dashboardStats(req) {
     }
     const opportunities = (await store.getOpportunities()).filter((row) => rbac.recordAllowed(req.access, row, 'opportunities'));
     const won = opportunities.filter((row) => row.status === 'won');
-    return { ...dashboardActivity(conversations, days), channels, updatedAt: new Date().toISOString(),
+    return { ...dashboardActivity(conversations, period, now), channels, updatedAt: new Date().toISOString(),
       contacts: contacts.size, messages: conversations.reduce((sum, row) => sum + row.messages.length, 0), opportunities: opportunities.length,
       wonOpportunities: won.length, revenue: won.reduce((sum, row) => sum + Number(row.value || 0), 0), conversionRate: opportunities.length ? Number((won.length / opportunities.length * 100).toFixed(1)) : 0 };
 }
@@ -1733,10 +1707,7 @@ app.get('/api/dashboard/export', async (req, res) => {
   try {
     const stats = await dashboardStats(req);
     await rbac.audit(req.access, 'reports.export', null, {}, stats);
-    res.setHeader('Content-Disposition', 'attachment; filename=relatorio-bot-wap.csv');
-    const summary = Object.entries(stats).filter(([, value]) => typeof value === 'number');
-    const daily = ['Data;Recebidas;Enviadas', ...stats.daily.map(row => `${row.date};${row.received};${row.sent}`)];
-    res.type('text/csv').send('\uFEFFIndicador;Valor\r\n' + summary.map(([key, value]) => `${key};${value}`).join('\r\n') + '\r\n\r\n' + daily.join('\r\n'));
+    await sendWorkbook(res, dashboardWorkbook(stats), 'relatorio-convelya.xlsx');
   } catch (error) { res.status(error.statusCode || 500).json({ error: error.message }); }
 });
 
@@ -1772,6 +1743,14 @@ io.on('connection', async (socket) => {
 });
 
 bot.on('event', ({ userId, chipId, chipNumber, event, payload }) => {
+  if (event === 'flow:incoming') {
+    db.ready.then(() => flowService.enqueue(userId, chipId, payload)).then(async () => {
+      const source = bot.workers.get(chipId)?.chip;
+      if (source) await requestChip(source, 'flow-event-ack', { eventId: payload.id });
+      flowService.start();
+    }).catch(error => console.error('[FLOW INBOX]', error.message));
+    return;
+  }
   // Reemite para a sala do usuário dono do chip
   const chip = bot.workers.get(chipId)?.chip || { id: chipId };
   const scoped = event === 'message' ? stampConversation(chip, payload) : event === 'active-target' ? { chipId, number: payload } : payload && typeof payload === 'object' ? { ...payload, chipId } : payload;
@@ -1789,6 +1768,7 @@ bot.on('event', ({ userId, chipId, chipNumber, event, payload }) => {
 // ---------- Start ----------
 const PORT = process.env.PORT || 3000;
 if (require.main === module) db.ready.then(async () => {
+  flowService.start();
   reportStorage();
   server.listen(PORT, () => {
     console.log(`🖥️  Servidor rodando na porta ${PORT}`);
@@ -1809,4 +1789,4 @@ if (require.main === module) db.ready.then(async () => {
   process.exitCode = 1;
 });
 
-module.exports = { app, server, io, bot, db };
+module.exports = { app, server, io, bot, db, flowService };

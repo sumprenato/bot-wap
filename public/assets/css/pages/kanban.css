@@ -219,3 +219,31 @@
 .funnel-move { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: 11px; color: var(--text-dim); }
 .funnel-move select { width: 100%; min-height: 38px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .funnel-outcome { display: inline-block; margin-top: 8px; font-size: 10px; color: var(--text-dim); }
+.funnel-toolbar { display: flex; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin: 0 0 20px; }
+.funnel-selector { display: grid; gap: 6px; font-size: 11px; color: var(--text-dim); min-width: 220px; max-width: 100%; }
+.funnel-selector select { width: 100%; padding: 10px 12px; min-height: 42px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; }
+.funnel-toolbar > button, .funnel-toolbar .record-actions-trigger { min-height: 42px; }
+.funnel-toolbar .record-actions-trigger { font-size: 24px; width: 42px; color: var(--live); }
+.funnel-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; box-sizing: border-box; padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.funnel-dialog::backdrop { background: #0008; }
+.funnel-dialog > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.funnel-dialog h2, .funnel-dialog header p { margin: 0; }
+.funnel-dialog h2 { font: 600 20px var(--font-display); }
+.funnel-dialog header p { margin-top: 6px; font-size: 12px; color: var(--text-dim); }
+.funnel-dialog form { display: grid; gap: 20px; }
+.funnel-dialog label { display: grid; gap: 8px; font-size: 12px; color: var(--text-dim); min-width: 0; }
+.funnel-dialog input, .funnel-dialog select { width: 100%; box-sizing: border-box; min-width: 0; min-height: 44px; padding: 10px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 9px; font: inherit; color-scheme: dark; }
+[data-theme="light"] .funnel-dialog input, [data-theme="light"] .funnel-dialog select { color-scheme: light; }
+.funnel-dialog fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.funnel-dialog legend { padding: 0; margin-bottom: 12px; color: var(--text-dim); font-size: 12px; }
+.funnel-date-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.funnel-dialog footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 12px; }
+.funnel-history { list-style: none; margin: 0; padding: 0; }
+.funnel-history li { padding: 14px 0; border-bottom: 1px solid var(--border-subtle); }
+.funnel-history p { margin: 0 0 8px; font-size: 13px; overflow-wrap: anywhere; }
+.funnel-history small { font-size: 11px; color: var(--text-dim); }
+@media (max-width: 720px) {
+  .funnel-selector { min-width: 0; flex: 1 1 170px; }
+  .funnel-dialog { padding: 18px; }
+  .funnel-toolbar { justify-content: flex-start; }
+}

@@ -1,0 +1,62 @@
+/* Shared dialogs live in the browser's top layer, outside the page layout. */
+html.has-modal, html.has-modal body { overflow: hidden; overscroll-behavior: none; }
+.app-modal.app-modal {
+  --modal-width: 520px;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  padding: 0;
+  width: min(var(--modal-width), calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 80px #0005;
+}
+.app-modal.app-modal--compact { --modal-width: 440px; }
+.app-modal.app-modal--large { --modal-width: 680px; }
+.app-modal.app-modal--wide { --modal-width: 920px; }
+.app-modal:not([open]) { display: none; }
+.app-modal::backdrop { background: #0009; backdrop-filter: blur(3px); }
+.app-modal-content { padding: 26px; min-width: 0; }
+.app-modal .inline-editor { margin: 0; min-width: 0; }
+.app-modal .editor-panel { padding: 0; width: 100%; max-width: none; min-width: 0; max-height: none; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; animation: none; }
+.app-modal .profile-form { max-width: none; }
+.app-modal .editor-head, .app-modal .editor-header, .app-modal .app-modal-content > header { margin: 0 0 22px; padding: 0 0 16px; border-bottom: 1px solid var(--border-subtle); }
+.app-modal .editor-close { display: none; }
+.app-modal h2 { margin: 0 0 20px; padding-right: 38px; font: 600 21px/1.35 var(--font-ui); letter-spacing: -.4px; overflow-wrap: anywhere; }
+.app-modal :is(.editor-head, .editor-header, header) h2 { margin-bottom: 0; }
+.app-modal .editor-description:empty { display: none; }
+.app-modal .editor-description { margin: -6px 0 20px; color: var(--text-dim); font-size: 13px; line-height: 1.6; }
+.app-modal-close {
+  position: absolute; right: 16px; top: 16px; z-index: 1;
+  display: grid; place-items: center; width: 34px; height: 34px;
+  padding: 0; border: 1px solid transparent; border-radius: 8px;
+  background: var(--surface); color: var(--text-dim); cursor: pointer; font: 400 25px/1 var(--font-ui);
+}
+.app-modal-close:hover { background: var(--surface-3); color: var(--text); border-color: var(--border); }
+.app-modal-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.app-modal-close:disabled { opacity: .5; cursor: wait; }
+.app-modal .confirm-actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; padding-top: 6px; }
+.app-modal .confirm-actions > button { min-height: 42px; margin-top: 0; }
+.app-modal :is(input, select, textarea) { max-width: 100%; box-sizing: border-box; }
+.app-modal .page-notice { margin: 16px 0 0; }
+.app-modal .funnel-history { max-width: 100%; }
+@media (prefers-reduced-motion: no-preference) {
+  .app-modal[open] { animation: modal-appear 160ms ease-out; }
+  .app-modal[open]::backdrop { animation: modal-backdrop-appear 160ms ease-out; }
+}
+@keyframes modal-appear { from { opacity: 0; scale: .98; } to { opacity: 1; scale: 1; } }
+@keyframes modal-backdrop-appear { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 600px) {
+  .app-modal.app-modal { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); border-radius: 13px; }
+  .app-modal-content { padding: 22px 18px; }
+  .app-modal h2 { font-size: 19px; }
+  .app-modal-close { top: 14px; right: 12px; }
+  .app-modal .confirm-actions { flex-wrap: wrap; }
+}

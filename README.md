@@ -1,4 +1,4 @@
-# Bot WhatsApp + Dashboard
+# Convelya
 
 Bot que encaminha mensagens de clientes do WhatsApp para o seu número, permite
 assumir a conversa manualmente (`!assumir`) e conta com uma dashboard web para
@@ -99,6 +99,18 @@ continuam aplicando as mesmas permissões e usam apenas metadados.
 também verifica uma conversa com 5.000 mensagens, envio, digitação, confirmações e
 acesso ao histórico anterior.
 
+O menu de mensagens recebe foco sem reposicionar o histórico. Quando mídias
+carregam após a abertura da conversa, o painel acompanha o fim somente se o
+usuário já estiver ali; quem está lendo mensagens anteriores mantém sua posição.
+`npm run test:message-scroll` cobre imagens atrasadas e cliques reais em mensagens
+total ou parcialmente visíveis, em desktop e celular.
+
+O relógio representa uma mensagem ainda pendente. Uma confirmação real do servidor
+WhatsApp muda o estado para **Enviado**; confirmações posteriores indicam
+**Entregue** e **Visualizado**. O retorno de `sendMessage` sozinho não confirma
+esses estados. Rejeições do servidor são registradas como falha, e respostas
+antigas não apagam uma confirmação ou erro mais recente.
+
 Quedas de rede e erros genéricos de stream (inclusive código 500) preservam as
 credenciais e reconectam com espera crescente, limitada a 30 segundos. A espera
 só volta ao início depois de uma conexão estável por pelo menos um minuto.
@@ -160,8 +172,9 @@ Essa conexão não implementa a API oficial WhatsApp Business Platform/Cloud API
 ### Importar contatos
 
 Em **Contatos → Importar contatos**, envie um CSV UTF-8 de até 2 MB e 5.000
-linhas. O botão **Baixar modelo CSV** fornece um exemplo. O CSV exportado pelo
-próprio painel também pode ser importado. São aceitos os separadores `;` e `,`,
+linhas. O botão **Baixar modelo CSV** fornece um exemplo. As exportações de
+contatos e relatórios usam Excel (`.xlsx`). Para reimportar contatos exportados,
+salve a planilha como CSV UTF-8 no Excel. São aceitos os separadores `;` e `,`,
 campos entre aspas e as colunas `Telefone` (obrigatória, com DDI), `Nome` e
 `Rótulos` (opcionais; separe os rótulos com vírgulas).
 
@@ -179,6 +192,14 @@ em `public/assets/js/site.js`, incluindo o cliente Socket.io, sem CDN de scripts
 Os antigos controladores de interface em `public/assets/js/app.js` e `pages/`
 não são carregados pelas páginas. As URLs continuam sendo servidas pelo Express,
 com links nativos, para preservar navegação, voltar/avançar e F5.
+
+As janelas de criação, edição, confirmação, filtros, chips e ações de mensagens
+usam o componente compartilhado `frontend/modal.jsx`. Elas abrem centralizadas,
+com fundo escurecido, fechamento por X/Esc/clique fora e foco restrito à janela.
+Formulários longos rolam dentro da janela. A confirmação de descarte da equipe
+preserva o formulário ao cancelar. `npm run test:modals` verifica centralização,
+teclado, retorno do foco, gravação em andamento e confirmações sobre o editor,
+em desktop/celular e nos dois temas.
 
 Depois de alterar `frontend/`, execute `npm run build`. O bundle e sua licença
 ficam em `public/assets/js/`. As animações cobrem cliques, navegação, cards,
@@ -300,6 +321,19 @@ não desconecta os outros. Reconectar com outra conta continua sendo recusado.
 - O teste de interface cria um banco temporário em `.tmp/`, simula o WhatsApp sem iniciar conexões e remove o banco ao terminar. As capturas de Funis ficam em `.tmp/funis-desktop.png` e `.tmp/funis-mobile.png`.
 
 A página **Funis** usa `/funis`; links antigos para `/kanban` redirecionam automaticamente. As APIs e os dados existentes continuam compatíveis.
+
+Em **Funis**, **Novo funil** cria um quadro independente. O seletor **Funil**
+alterna entre os quadros; **Adicionar etapa** cria uma etapa no quadro selecionado.
+Etapas e oportunidades antigas são preservadas no **Funil principal** pela
+migração automática. Os acessos existentes às etapas também são preservados.
+O botão **Filtros** combina título/contato, contato vinculado, responsável e
+período de atualização no horário de Brasília. A situação da oportunidade
+continua disponível no seletor **Exibir oportunidades**.
+O menu de configurações permite renomear o funil, consultar seu histórico e
+apagá-lo com confirmação, incluindo suas etapas e oportunidades. O histórico
+registra alterações feitas após a atualização e mostra até 200 entradas
+autorizadas. `npm run test:funnels` verifica esse fluxo em desktop/celular e nos
+dois temas, com o WhatsApp simulado; `npm test` verifica migração e isolamento.
 
 ## Cargos, permissões e contas
 

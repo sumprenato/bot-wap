@@ -37,7 +37,7 @@ export function TeamEditor({ ctx }) {
   };
   return <div className="inline-editor" id="teamMemberModal"><div className="editor-panel editor-panel--team" role="region" aria-labelledby="teamMemberModalTitle">
     <header className="editor-header"><div><p className="eyebrow">equipe e acessos</p><h2 id="teamMemberModalTitle">{permissionOnly ? 'Gerenciar permissões' : member ? 'Editar membro' : 'Novo membro'}</h2></div><button type="button" className="editor-close" aria-label="Fechar" onClick={close}>×</button></header>
-    <form id="teamMemberForm" className="profile-form team-form" onSubmit={save}>
+    <form id="teamMemberForm" className="profile-form team-form" aria-busy={busy} onSubmit={save}>
       {!permissionOnly && <><div className="profile-field"><label htmlFor="teamMemberName">Nome</label><input id="teamMemberName" value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={60} required /></div>
       <div className="profile-field"><label htmlFor="teamMemberEmail">E-mail</label><input id="teamMemberEmail" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} maxLength={120} required /></div>
       <div className="profile-field"><label htmlFor="teamMemberPassword">{member ? 'Nova senha (opcional)' : 'Senha'}</label><input id="teamMemberPassword" type="password" autoComplete="new-password" value={form.password} onChange={(e) => set('password', e.target.value)} minLength={6} maxLength={128} required={!member} /></div></>}

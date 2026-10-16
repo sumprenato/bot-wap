@@ -618,5 +618,5 @@ async function transaction(fn) {
   } finally { client?.release(); activeTransaction = null; release(); }
 }
 const database = { run, get, all, transaction, close, backend: () => backend, STORAGE_DIR };
-database.ready = ready.then(() => require('./rbac-migration').migrate(database));
+database.ready = ready.then(() => require('./rbac-migration').migrate(database)).then(() => require('./funnel-migration').migrate(database)).then(() => require('./flows/migration').migrate(database)).then(() => require('./whatsapp-message-retry').migrate(database));
 module.exports = database;

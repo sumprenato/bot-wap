@@ -41,6 +41,12 @@ html:not([data-theme="light"]) .analytics-dashboard { --analytics-green: #62cbb0
 .analytics-header-actions .text-action--primary { padding: 10px 14px; box-shadow: none; }
 .analytics-toolbar, .analytics-filters, .analytics-updated { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .analytics-toolbar { justify-content: space-between; }
+.analytics-custom-period { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--surface); }
+.analytics-custom-period label { display: grid; gap: 6px; flex: 1 1 140px; max-width: 210px; min-width: 0; color: var(--text-dim); font-size: 12px; }
+.analytics-custom-period input { width: 100%; min-width: 0; box-sizing: border-box; padding: 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; color-scheme: dark; }
+[data-theme="light"] .analytics-custom-period input { color-scheme: light; }
+.analytics-custom-period > button { min-height: 36px; }
+.analytics-custom-period [role="alert"] { flex-basis: 100%; color: var(--danger); font-size: 12px; }
 .analytics-segment { display: inline-flex; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--surface); gap: 3px; }
 .analytics-segment button { padding: 7px 11px; border: 0; border-radius: 7px; background: transparent; color: var(--text-dim); cursor: pointer; font-size: 11px; white-space: nowrap; }
 .analytics-segment button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); font-weight: 700; }

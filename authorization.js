@@ -90,7 +90,7 @@ function middleware({ botRequest, getChips }) {
       if (!access || (req.session.authVersion != null && req.session.authVersion !== access.user.auth_version)) return res.status(401).json({ error: 'Sessão revogada. Faça login novamente.' });
       req.access = access; req.botRequest = botRequest;
       const permission = rbac.routePermission(req.method, req.path);
-      const allowed = permission === null || permission === 'state' || (permission === 'contacts-sync' ? ['atendimento.visualizar', 'contatos.visualizar', 'chips.visualizar'].some(value => rbac.can(access, value)) : permission === 'owner' ? access.owner : permission === 'profile-photo' ? rbac.can(access, 'atendimento.visualizar') || rbac.can(access, 'contatos.visualizar') || req.path.endsWith('/me') : rbac.can(access, permission));
+      const allowed = permission === null || permission === 'state' || (permission === 'flow-media' ? rbac.can(access, 'fluxos.visualizar') || rbac.can(access, 'atendimento.visualizar') : permission === 'contacts-sync' ? ['atendimento.visualizar', 'contatos.visualizar', 'chips.visualizar'].some(value => rbac.can(access, value)) : permission === 'owner' ? access.owner : permission === 'profile-photo' ? rbac.can(access, 'atendimento.visualizar') || rbac.can(access, 'contatos.visualizar') || req.path.endsWith('/me') : rbac.can(access, permission));
       if (!allowed) {
         await rbac.audit(access, 'access.denied', null, {}, { method: req.method, path: req.path });
         return res.status(403).json({ error: 'Você não tem autorização para esta ação.' });

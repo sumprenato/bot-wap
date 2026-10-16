@@ -1,5 +1,5 @@
 /* =====================================================
-   BOT WAP — DESIGN SYSTEM
+   CONVELYA — DESIGN SYSTEM
    DM Sans (UI) + Space Grotesk (títulos) + IBM Plex Mono
    ===================================================== */
 
@@ -2596,7 +2596,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 }
 
 /* =====================================================
-   BOT WAP WORKSPACE — navigation, tables and reporting
+   CONVELYA WORKSPACE — navigation, tables and reporting
    ===================================================== */
 :root { --nav-width: 264px; }
 html { color-scheme: dark; }

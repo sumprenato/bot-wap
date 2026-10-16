@@ -26,6 +26,7 @@ function formatConversation(convo, rows, aliases = []) {
     lastFrom: convo.last_from || '',
     departmentId: convo.department_id || null,
     assignedUserId: convo.assigned_user_id || null,
+    flowStopped: !!convo.flow_stopped,
     chip: convo.chip || null,
     tags: parseJson(convo.tags, []),
     finalizedAt: convo.finalized_at || null,
@@ -191,7 +192,7 @@ async function updateMessageStatus(waMsgId, status, returnConversation = true) {
   if (!waMsgId || !Number.isInteger(status) || status < 0 || status > 5) return null;
   const result = await db.run(`INSERT INTO message_receipts (whatsapp_msg_id, status) VALUES (?, ?)
     ON CONFLICT(whatsapp_msg_id) DO UPDATE SET status = excluded.status
-    WHERE excluded.status > message_receipts.status OR (excluded.status = 0 AND message_receipts.status < 2 AND message_receipts.status <> 0)`, [waMsgId, status]);
+    WHERE (excluded.status > message_receipts.status AND NOT (message_receipts.status = 0 AND excluded.status = 1)) OR (excluded.status = 0 AND message_receipts.status < 2 AND message_receipts.status <> 0)`, [waMsgId, status]);
   if (!returnConversation || !result.changes) return null;
   const message = await db.get("SELECT number FROM messages WHERE whatsapp_msg_id = ? AND from_role = 'admin'", [waMsgId]);
   return message ? getConversation(message.number, false, { messageId: waMsgId }) : null;
@@ -209,10 +210,10 @@ async function insertMessage(number, from, text, name, media, waMsgId, waStatus,
   await ensureConversation(number, name);
 
   const at = details.at ? new Date(details.at).toISOString() : new Date().toISOString();
+  if (from === 'admin' && waMsgId && Number.isInteger(waStatus)) await updateMessageStatus(waMsgId, waStatus, false);
   if (waMsgId && await db.get('SELECT id FROM messages WHERE number = ? AND whatsapp_msg_id = ?', [number, waMsgId])) {
     return details.deferConversation ? { number } : getConversation(number);
   }
-  if (from === 'admin' && waMsgId && Number.isInteger(waStatus)) await updateMessageStatus(waMsgId, waStatus, false);
   const hasMedia = !!(media && media.type && media.type !== 'text');
 
   await db.run(
@@ -343,9 +344,16 @@ async function finalizeConversation(number) {
 async function reopenConversation(number) {
   number = await resolveConversationNumber(number);
   await db.run(
-    'UPDATE conversations SET is_finalized = 0, finalized_at = NULL WHERE number = ?',
+    'UPDATE conversations SET is_finalized = 0, finalized_at = NULL, flow_stopped = 0 WHERE number = ?',
     [number]
   );
+  return getConversation(number);
+}
+
+async function stopConversationFlow(number) {
+  number = await resolveConversationNumber(number);
+  await ensureConversation(number);
+  await db.run('UPDATE conversations SET flow_stopped = 1 WHERE number = ?', [number]);
   return getConversation(number);
 }
 
@@ -614,20 +622,32 @@ async function getKanbanColumns() {
   return db.all('SELECT * FROM kanban_columns WHERE account_id = ? ORDER BY position ASC', [accountId()]);
 }
 
-async function createKanbanColumn(name) {
+async function createKanbanColumn(name, funnelId) {
+  const funnels = require('./funnel-store');
+  const funnel = funnelId ? await db.get('SELECT * FROM funnels WHERE id = ? AND account_id = ?', [funnelId, accountId()]) : await funnels.defaultFunnel();
+  if (!funnel) throw Object.assign(new Error('Funil não encontrado.'), { statusCode: 404 });
   const now = new Date().toISOString();
-  const countRow = await db.get('SELECT COUNT(*) as c FROM kanban_columns WHERE account_id = ?', [accountId()]);
+  const countRow = await db.get('SELECT COUNT(*) as c FROM kanban_columns WHERE account_id = ? AND funnel_id = ?', [accountId(), funnel.id]);
   const position = Number(countRow?.c || 0);
-  const result = await db.run('INSERT INTO kanban_columns (name, position, created_at, account_id, created_by, department_id) VALUES (?, ?, ?, ?, ?, ?)', [name, position, now, accountId(), actorId(), departmentId()]);
-  return db.get('SELECT * FROM kanban_columns WHERE id = ? AND account_id = ?', [result.lastID, accountId()]);
+  const result = await db.run('INSERT INTO kanban_columns (name, position, created_at, account_id, created_by, department_id, funnel_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, position, now, accountId(), actorId(), departmentId(), funnel.id]);
+  const actor = await db.get('SELECT funnels FROM users WHERE id = ? AND account_id = ?', [actorId(), accountId()]);
+  if (actor) await db.run('UPDATE users SET funnels = ? WHERE id = ? AND account_id = ?', [JSON.stringify([...new Set([...parseJson(actor.funnels, []), String(result.lastID)])]), actorId(), accountId()]);
+  const column = await db.get('SELECT * FROM kanban_columns WHERE id = ? AND account_id = ?', [result.lastID, accountId()]);
+  await funnels.columnHistory(column, `Etapa "${name}" criada.`);
+  return column;
 }
 
 async function updateKanbanColumn(id, name) {
   await db.run('UPDATE kanban_columns SET name = ? WHERE id = ? AND account_id = ?', [name, id, accountId()]);
-  return db.get('SELECT * FROM kanban_columns WHERE id = ? AND account_id = ?', [id, accountId()]);
+  const column = await db.get('SELECT * FROM kanban_columns WHERE id = ? AND account_id = ?', [id, accountId()]);
+  await require('./funnel-store').columnHistory(column, `Etapa renomeada para "${name}".`);
+  return column;
 }
 
 async function deleteKanbanColumn(id) {
+  const column = await db.get('SELECT * FROM kanban_columns WHERE id = ? AND account_id = ?', [id, accountId()]);
+  await require('./funnel-store').columnHistory(column, `Etapa "${column?.name}" excluída.`);
+  await db.run('DELETE FROM opportunities WHERE column_id = ? AND account_id = ?', [id, accountId()]);
   await db.run('DELETE FROM kanban_columns WHERE id = ? AND account_id = ?', [id, accountId()]);
   return true;
 }
@@ -643,30 +663,48 @@ async function createOpportunity(data) {
   const position = Number(countRow?.c || 0);
   const result = await db.run('INSERT INTO opportunities (title, contact_number, contact_name, value, column_id, position, status, created_at, updated_at, account_id, created_by, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [data.title, data.contact_number || '', data.contact_name || '', data.value || 0, data.column_id, position, 'open', now, now, accountId(), actorId(), departmentId()]
   );
-  return db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [result.lastID, accountId()]);
+  const item = await db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [result.lastID, accountId()]);
+  await require('./funnel-store').opportunityHistory(item, `Oportunidade "${item.title}" criada.`);
+  return item;
 }
 
 async function updateOpportunity(id, data) {
+  const before = await db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
   const now = new Date().toISOString();
   await db.run('UPDATE opportunities SET title = ?, contact_number = ?, contact_name = ?, value = ?, column_id = ?, position = ?, updated_at = ? WHERE id = ? AND account_id = ?', [data.title, data.contact_number || '', data.contact_name || '', data.value || 0, data.column_id, data.position || 0, now, id, accountId()]
   );
-  return db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
+  const item = await db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
+  if (item) {
+    const description = `Oportunidade "${item.title}" ${String(before?.column_id) !== String(item.column_id) ? 'movida de etapa' : 'atualizada'}.`;
+    await require('./funnel-store').opportunityHistory(item, description);
+    if (before && String(before.column_id) !== String(item.column_id)) {
+      const [source, target] = await Promise.all([db.get('SELECT funnel_id FROM kanban_columns WHERE id = ?', [before.column_id]), db.get('SELECT funnel_id FROM kanban_columns WHERE id = ?', [item.column_id])]);
+      if (source?.funnel_id !== target?.funnel_id) await require('./funnel-store').opportunityHistory(before, description);
+    }
+  }
+  return item;
 }
 
 async function winOpportunity(id) {
   const now = new Date().toISOString();
   await db.run('UPDATE opportunities SET status = ?, won_at = ?, updated_at = ? WHERE id = ? AND account_id = ?', ['won', now, now, id, accountId()]);
-  return db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
+  const item = await db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
+  if (item) await require('./funnel-store').opportunityHistory(item, `Oportunidade "${item.title}" marcada como ganha.`);
+  return item;
 }
 
 async function loseOpportunity(id, lossReasonId) {
   const now = new Date().toISOString();
   await db.run('UPDATE opportunities SET status = ?, lost_at = ?, loss_reason_id = ?, updated_at = ? WHERE id = ? AND account_id = ?', ['lost', now, lossReasonId || null, now, id, accountId()]
   );
-  return db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
+  const item = await db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
+  if (item) await require('./funnel-store').opportunityHistory(item, `Oportunidade "${item.title}" marcada como perdida.`);
+  return item;
 }
 
 async function deleteOpportunity(id) {
+  const item = await db.get('SELECT * FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
+  if (item) await require('./funnel-store').opportunityHistory(item, `Oportunidade "${item.title}" excluída.`);
   await db.run('DELETE FROM opportunities WHERE id = ? AND account_id = ?', [id, accountId()]);
   return true;
 }
@@ -688,57 +726,25 @@ async function deleteLossReason(id) {
 }
 
 // ==================== FLOWS CRUD ====================
-async function getFlows() {
-  const rows = await db.all('SELECT * FROM flows WHERE account_id = ? ORDER BY created_at DESC', [accountId()]);
-  return rows.map((r) => ({
-    ...r,
-    nodes: parseJson(r.nodes, []),
-    edges: parseJson(r.edges, []),
-    trigger_keywords: parseJson(r.trigger_keywords, []),
-    trigger_chips: parseJson(r.trigger_chips, []),
-  }));
-}
-
-async function createFlow(data) {
-  const now = new Date().toISOString();
-  const result = await db.run('INSERT INTO flows (name, description, nodes, edges, active, trigger_keywords, trigger_chips, created_at, updated_at, account_id, created_by, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [data.name, data.description || '', JSON.stringify(data.nodes || []), JSON.stringify(data.edges || []), 0, JSON.stringify(data.trigger_keywords || []), JSON.stringify(data.trigger_chips || []), now, now, accountId(), actorId(), departmentId()]
-  );
-  const row = await db.get('SELECT * FROM flows WHERE id = ? AND account_id = ?', [result.lastID, accountId()]);
-  return { ...row, nodes: parseJson(row.nodes, []), edges: parseJson(row.edges, []), trigger_keywords: parseJson(row.trigger_keywords, []), trigger_chips: parseJson(row.trigger_chips, []) };
-}
-
-async function updateFlow(id, data) {
-  const now = new Date().toISOString();
-  await db.run('UPDATE flows SET name = ?, description = ?, nodes = ?, edges = ?, active = ?, trigger_keywords = ?, trigger_chips = ?, updated_at = ? WHERE id = ? AND account_id = ?', [data.name, data.description || '', JSON.stringify(data.nodes || []), JSON.stringify(data.edges || []), data.active ? 1 : 0, JSON.stringify(data.trigger_keywords || []), JSON.stringify(data.trigger_chips || []), now, id, accountId()]
-  );
-  const row = await db.get('SELECT * FROM flows WHERE id = ? AND account_id = ?', [id, accountId()]);
-  return { ...row, nodes: parseJson(row.nodes, []), edges: parseJson(row.edges, []), trigger_keywords: parseJson(row.trigger_keywords, []), trigger_chips: parseJson(row.trigger_chips, []) };
-}
-
+async function getFlows() { return require('./flows/store').list(); }
+async function createFlow(data) { return require('./flows/store').create(data); }
+async function updateFlow(id, data) { return require('./flows/store').update(id, data); }
 async function duplicateFlow(id) {
-  const original = await db.get('SELECT * FROM flows WHERE id = ? AND account_id = ?', [id, accountId()]);
-  if (!original) throw new Error('Fluxo não encontrado.');
-  const now = new Date().toISOString();
-  const result = await db.run('INSERT INTO flows (name, description, nodes, edges, active, trigger_keywords, trigger_chips, created_at, updated_at, account_id, created_by, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [`${original.name} (cópia)`, original.description, original.nodes, original.edges, 0, original.trigger_keywords, original.trigger_chips, now, now, accountId(), actorId(), departmentId()]
-  );
-  const row = await db.get('SELECT * FROM flows WHERE id = ? AND account_id = ?', [result.lastID, accountId()]);
-  return { ...row, nodes: parseJson(row.nodes, []), edges: parseJson(row.edges, []), trigger_keywords: parseJson(row.trigger_keywords, []), trigger_chips: parseJson(row.trigger_chips, []) };
+  const flows = require('./flows/store'), original = await flows.get(id);
+  if (!original) throw new Error('Fluxo nao encontrado.');
+  return flows.create({name: original.name.slice(0,110) + ' (copia)', description: original.description, definition: flows.remap(original.definition), trigger_chips: original.trigger_chips});
 }
-
-async function deleteFlow(id) {
-  await db.run('DELETE FROM flows WHERE id = ? AND account_id = ?', [id, accountId()]);
-  return true;
-}
+async function deleteFlow(id) { await require('./flows/store').remove(id); return true; }
 
 // ==================== GLOBAL VARIABLES ====================
 async function getGlobalVariables() {
   return db.all('SELECT * FROM global_variables WHERE account_id = ? ORDER BY key ASC', [accountId()]);
 }
 
-async function setGlobalVariable(key, value) {
+async function setGlobalVariable(key, value, valueType = 'text') {
   const now = new Date().toISOString();
-  await db.run(`INSERT INTO global_variables (key, value, created_at, account_id, created_by, department_id) VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(account_id, key) DO UPDATE SET value = excluded.value`, [key.trim(), value, now, accountId(), actorId(), departmentId()]
+  await db.run(`INSERT INTO global_variables (key, value, value_type, created_at, account_id, created_by, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(account_id, key) DO UPDATE SET value = excluded.value, value_type = excluded.value_type`, [key.trim(), value, valueType, now, accountId(), actorId(), departmentId()]
   );
   return db.get('SELECT * FROM global_variables WHERE key = ? AND account_id = ?', [key.trim(), accountId()]);
 }
@@ -803,6 +809,7 @@ module.exports = {
   getConversationTags,
   finalizeConversation,
   reopenConversation,
+  stopConversationFlow,
   setConversationDepartment,
   setDefaultConversationDepartment,
   setAllConversationsDepartment,
@@ -861,3 +868,9 @@ module.exports = {
   updateFollowup,
   deleteFollowup,
 };
+
+// Keep each board change and its history entry atomic.
+for (const name of ['createKanbanColumn', 'updateKanbanColumn', 'deleteKanbanColumn', 'createOpportunity', 'updateOpportunity', 'winOpportunity', 'loseOpportunity', 'deleteOpportunity']) {
+  const operation = module.exports[name];
+  module.exports[name] = (...args) => db.transaction(() => operation(...args));
+}

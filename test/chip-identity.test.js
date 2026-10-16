@@ -25,10 +25,11 @@ test('QR identity gates contacts/messages, persists the actual phone and refuses
   const load = Module._load;
   Module._load = function (name, ...args) {
     if (name === '@whiskeysockets/baileys') return {
+      generateMessageIDV2: () => `sent-${sent.length + 1}`,
       default: (config) => {
         const handlers = {};
         const socket = { user: null, ev: { on: (event, callback) => { handlers[event] = callback; } }, handlers,
-          ws: { close() {} }, logout: async () => { socket.loggedOut = true; }, resyncAppState: async () => {}, sendMessage: async (jid, content, options) => { sent.push({ jid, content, options }); return { key: { id: `sent-${sent.length}`, remoteJid: jid, fromMe: true }, message: content.text ? { conversation: content.text } : {}, status: 1 }; } };
+          ws: { close() {}, on: (event, callback) => { handlers['ws:' + event] = callback; } }, logout: async () => { socket.loggedOut = true; }, resyncAppState: async () => {}, sendMessage: async (jid, content, options) => { sent.push({ jid, content, options }); return { key: { id: `sent-${sent.length}`, remoteJid: jid, fromMe: true }, message: content.text ? { conversation: content.text } : {}, status: 1 }; } };
         socket.config = config;
         sockets.push(socket); return socket;
       },
@@ -162,12 +163,21 @@ test('QR identity gates contacts/messages, persists the actual phone and refuses
   assert.deepEqual(await correct.config.getMessage({ remoteJid: `${savedNumber}@s.whatsapp.net`, id: lastSentId }), { conversation: 'Sem assinatura' }, 'retry callback returns the actual sent payload');
   assert.equal(await first.config.getMessage({ remoteJid: `${savedNumber}@s.whatsapp.net`, id: lastSentId }), undefined, 'stale sockets cannot retrieve payloads');
   assert.equal((await store.getConversation(savedNumber)).messages.at(-1).deliveryStatus, 1);
+  await first.handlers['ws:CB:ack,class:message']({ attrs: { id: lastSentId } });
+  assert.equal((await store.getConversation(savedNumber)).messages.at(-1).deliveryStatus, 1, 'stale transports cannot acknowledge another session');
+  await correct.handlers['ws:CB:ack,class:message']({ attrs: { id: lastSentId } });
+  assert.equal((await store.getConversation(savedNumber)).messages.at(-1).deliveryStatus, 2, 'the real server ack clears pending even without a delivery receipt (self-chat)');
   for (const [status, expected] of [[2, 2], [3, 3], [4, 4], [2, 4]]) {
     await correct.handlers['messages.update']([{ key: { id: lastSentId, fromMe: true, remoteJid: `${savedNumber}@s.whatsapp.net` }, update: { status } }]);
     assert.equal((await store.getConversation(savedNumber)).messages.at(-1).deliveryStatus, expected);
   }
   await correct.handlers['messages.update']([{ key: { id: lastSentId, fromMe: false }, update: { status: 5 } }]);
   assert.equal((await store.getAll())[savedNumber].messages.at(-1).deliveryStatus, 4);
+  await correct.handlers['ws:CB:ack,class:message']({ attrs: { id: lastSentId } });
+  await correct.handlers['ws:CB:ack,class:message']({ attrs: { id: lastSentId, error: '500' } });
+  assert.equal((await store.getAll())[savedNumber].messages.at(-1).deliveryStatus, 4, 'late transport acks cannot regress a read receipt');
+  await correct.handlers['ws:CB:ack,class:message']({ attrs: { id: 'negative-ack', error: '500' } });
+  assert.equal((await db.get('SELECT status FROM message_receipts WHERE whatsapp_msg_id = ?', ['negative-ack'])).status, 0, 'an actual server rejection records failure');
   const beforeEcho = (await store.getConversation(savedNumber)).messages.length;
   await correct.handlers['messages.upsert']({ type: 'notify', messages: [{ key: { id: lastSentId, remoteJid: `${savedNumber}@s.whatsapp.net`, fromMe: true }, message: { conversation: 'Sem assinatura' }, status: 4 }] });
   assert.equal((await store.getConversation(savedNumber)).messages.length, beforeEcho);
@@ -175,6 +185,8 @@ test('QR identity gates contacts/messages, persists the actual phone and refuses
   assert.equal(sent.at(-1).content.text, '*Atendente*: Com assinatura');
   const media = { type: 'image', buffer: Buffer.from('test'), mimeType: 'image/png', caption: 'Legenda', mediaUrl: '/test.png' };
   const nextId = `sent-${sent.length + 1}`;
+  await correct.handlers['ws:CB:ack,class:message']({ attrs: { id: nextId } });
+  assert.equal((await db.get('SELECT status FROM message_receipts WHERE whatsapp_msg_id = ?', [nextId])).status, 2, 'server acknowledgements arriving before insertion are retained');
   await correct.handlers['messages.update']([{ key: { id: nextId, fromMe: true }, update: { status: 4 } }]);
   await bot.sendMediaToClient(savedNumber, media, null);
   assert.equal(sent.at(-1).content.caption, 'Legenda');

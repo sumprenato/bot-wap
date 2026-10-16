@@ -17,7 +17,8 @@ import { useAttendancePreferences } from './attendance-preferences';
 import { can, pagePermissions, resourcePermissions, actionPermission } from './access';
 import { TeamEditor, TeamList } from './team';
 import { AccountSettings } from './account-settings';
-import { mergeConversationMap } from '../conversation-update';
+import { mergeConversationMap, mergeState } from '../conversation-update';
+import { FlowsPage } from './flows';
 
 const defaults = {
   contacts: [],
@@ -29,7 +30,7 @@ const defaults = {
   webhooks: [],
   chips: [],
   followups: [],
-  kanban: { columns: [], opportunities: [] },
+  kanban: { funnels: [], columns: [], opportunities: [], responsibles: [] },
   reasons: [],
   variables: [],
   stats: {},
@@ -54,7 +55,7 @@ const resources = {
 const pageResources = {
   overview: ["kanban"],
   campaigns: ["campaigns"],
-  flows: ["flows", "variables"],
+  flows: ["flows", "variables", "kanban", "team", "chips"],
   webhooks: ["webhooks"],
   kanban: ["kanban", "reasons"],
   chips: ["chips"],
@@ -78,6 +79,7 @@ export function Application({ layout, page, title, onNavigate }) {
     [fields, setFields] = useState({
       ...layout.fields,
       departmentFilter: workspace.departmentFilter || "all",
+      kanbanFunnelId: workspace.selectedFunnelId || "",
     });
   const [files, setFiles] = useState({}),
     [replyTarget, setReplyTarget] = useState(null),
@@ -134,6 +136,7 @@ export function Application({ layout, page, title, onNavigate }) {
     }
     const [url, property] = resources[key];
     const requestedChannel = getApiChannel();
+    const requestedState = latest.current?.data.state;
     const result = await api(url);
     if (["state", "contacts"].includes(key) && requestedChannel !== getApiChannel()) return result;
     const value = property ? result[property] || [] : result;
@@ -142,7 +145,12 @@ export function Application({ layout, page, title, onNavigate }) {
       setApiChannel(value.chipId);
       setChannelId(String(value.chipId || ""));
     }
-    setData((previous) => ({ ...previous, [key]: value }));
+    setData((previous) => {
+      // A live update during this request is newer than its snapshot. Applying
+      // that snapshot would remove messages and make the open history jump.
+      if (key === 'state' && requestedState && previous.state !== requestedState) return previous;
+      return { ...previous, [key]: key === 'state' ? mergeState(previous.state, value) : value };
+    });
     return value;
   }, []);
   const refresh = useCallback(async () => {
@@ -240,6 +248,7 @@ export function Application({ layout, page, title, onNavigate }) {
         "bwap-workspace-state",
         JSON.stringify({
           selectedChipId: getApiChannel(),
+          selectedFunnelId: fields.kanbanFunnelId || "",
           selectedNumber: target,
           conversationFilter: filter,
           departmentFilter: fields.departmentFilter || "all",
@@ -266,13 +275,14 @@ export function Application({ layout, page, title, onNavigate }) {
         "bwap-workspace-state",
         JSON.stringify({
           selectedChipId: channel,
+          selectedFunnelId: fields.kanbanFunnelId || "",
           selectedNumber: selected,
           conversationFilter: filter,
           departmentFilter: fields.departmentFilter || "all",
         }),
       );
     } catch {}
-  }, [selected, channel, filter, fields.departmentFilter]);
+  }, [selected, channel, filter, fields.departmentFilter, fields.kanbanFunnelId]);
   useEffect(() => {
     const number = canonical(selected);
     if (number !== selected) setSelected(number);
@@ -326,7 +336,7 @@ export function Application({ layout, page, title, onNavigate }) {
     });
     socketRef.current = socket;
     socket.on("init", (state) =>
-      { if (!getApiChannel() || String(state.chipId) === getApiChannel()) { if (state.authorization) { accessRef.current = state.authorization; setAccess(state.authorization); } setApiChannel(state.chipId); setChannelId(String(state.chipId || "")); setData((previous) => ({ ...previous, state })); } },
+      { if (!getApiChannel() || String(state.chipId) === getApiChannel()) { if (state.authorization) { accessRef.current = state.authorization; setAccess(state.authorization); } setApiChannel(state.chipId); setChannelId(String(state.chipId || "")); setData((previous) => ({ ...previous, state: mergeState(previous.state, state) })); } },
     );
     socket.on('authorization:changed', ({ authorization }) => {
       const previousAccess = accessRef.current;
@@ -727,7 +737,7 @@ export function Application({ layout, page, title, onNavigate }) {
       );
     return value;
   };
-  ctx.replace = (node) => node.props.id === 'teamMemberModal' && editor?.id === 'teamMemberModal' ? <TeamEditor key={editor.item?.id || 'new'} ctx={ctx} /> : undefined;
+  ctx.replace = (node) => node.props.id === 'flowsPage' ? <><Workspace /><FlowsPage ctx={ctx} /></> : node.props.id === 'teamMemberModal' && editor?.id === 'teamMemberModal' ? <TeamEditor key={editor.item?.id || 'new'} ctx={ctx} /> : undefined;
   ctx.composerKey = (event) => {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
       event.preventDefault();
@@ -775,6 +785,7 @@ export function Application({ layout, page, title, onNavigate }) {
   useEffect(() => {
     const keyboard = (event) => {
       if (latest.current?.contactsBlocked) return;
+      if (document.querySelector('dialog:modal')) return;
       if (event.key === "Escape") {
         latest.current.answer(false);
         latest.current.closeEditor();

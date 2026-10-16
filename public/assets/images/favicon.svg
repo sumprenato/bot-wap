@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Convelya</title>
+  <path fill="#73dcb0" d="M16 4h32a12 12 0 0 1 12 12v28a12 12 0 0 1-12 12H22L4 62V16A12 12 0 0 1 16 4Z"/>
+  <path fill="none" stroke="#09291e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" d="M43 22a15 15 0 1 0 0 20"/>
+</svg>

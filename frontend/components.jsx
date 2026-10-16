@@ -1,8 +1,9 @@
 import React, { useContext, useEffect, useId, useRef, useState } from "react";
 import { UI, TemplateNode } from "./template";
 import { actionPermission } from './access';
+import { Modal } from './modal';
 
-export function ActionMenu({ label, children }) {
+export function ActionMenu({ label, children, icon }) {
   const ctx = useContext(UI), id = useId(), menu = useRef(null), trigger = useRef(null);
   const [open, setOpen] = useState(false);
   const available = (nodes) => React.Children.toArray(nodes).some((child) => React.isValidElement(child) && (child.type === React.Fragment ? available(child.props.children) : !ctx.can || ctx.can(actionPermission(child.props))));
@@ -20,7 +21,7 @@ export function ActionMenu({ label, children }) {
     panel.style.left = `${Math.max(8, Math.min(rect.right - 224, window.innerWidth - 232))}px`;
     panel.style.top = `${rect.bottom + 6}px`; panel.showPopover();
     if (rect.bottom + 6 + panel.offsetHeight > window.innerHeight - 8) panel.style.top = `${Math.max(8, rect.top - panel.offsetHeight - 6)}px`;
-  }}>⋯</button><div ref={menu} id={id} popover="auto" className="record-actions-menu" role="group" aria-label={label} onToggle={(event) => setOpen(event.newState === 'open')} onClick={(event) => { if (event.target.closest('button')) menu.current.hidePopover(); }}>{children}</div></div>;
+  }}>{icon || "⋯"}</button><div ref={menu} id={id} popover="auto" className="record-actions-menu" role="group" aria-label={label} onToggle={(event) => setOpen(event.newState === 'open')} onClick={(event) => { if (event.target.closest('button')) menu.current.hidePopover(); }}>{children}</div></div>;
 }
 
 export function Action({ action, children, ...props }) {
@@ -180,6 +181,7 @@ export function ResourceForm({ definition }) {
         <p className="editor-description">{definition.description}</p>
         <form
           className="profile-form"
+          aria-busy={busy}
           noValidate
           onSubmit={async (event) => {
             event.preventDefault();
@@ -287,16 +289,16 @@ export function ResourceForm({ definition }) {
 export function Workspace() {
   const ctx = useContext(UI);
   const ref = useRef(null);
-  useEffect(() => {
-    if (ctx.editor)
-      ref.current
-        ?.querySelector("input:not([type=hidden]),textarea,select,button")
-        ?.focus();
-  }, [ctx.editor?.id]);
+  const close = () => {
+    const existing = ref.current?.querySelector('.editor-close');
+    if (existing) existing.click();
+    else ctx.closeEditor();
+  };
   return (
-    <div ref={ref}>
-      <Notice />
+    <div>
+      {!ctx.editor && <Notice />}
       {ctx.confirmation && (
+        <Modal key="confirmation" onClose={() => ctx.answer(false)} labelledBy="confirmTitle" size="compact">
         <div className="inline-editor" id="confirmModal">
           <div className="editor-panel editor-panel--sm">
             <h2 id="confirmTitle">{ctx.confirmation.title}</h2>
@@ -321,7 +323,10 @@ export function Workspace() {
             </div>
           </div>
         </div>
+        </Modal>
       )}
+      {ctx.editor && <Modal key={ctx.editor.id} onClose={close} busy={Boolean(ctx.busy)} size={ctx.editor.id === 'teamMemberModal' ? 'wide' : ['campaignModal', 'flowModal', 'globalVarsModal'].includes(ctx.editor.id) ? 'large' : 'standard'}>
+      <div ref={ref}>
       {ctx.editor?.resource ? (
         <ResourceForm key={ctx.editor.id} definition={ctx.editor.resource} />
       ) : (
@@ -340,6 +345,9 @@ export function Workspace() {
           />
         )
       )}
+      {ctx.notice?.type === 'error' && <Notice />}
+      </div>
+      </Modal>}
     </div>
   );
 }

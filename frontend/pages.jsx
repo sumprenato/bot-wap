@@ -11,6 +11,7 @@ import { Action, ActionMenu, DataTable, Empty } from "./components";
 import { Avatar } from "./avatar";
 import { Chips } from "./chips";
 import { Dashboard } from './dashboard';
+import { FunnelToolbar, createFunnel, selectedFunnel, funnelColumns, filteredOpportunities } from './funnels';
 
 const money = (value) =>
   Number(value || 0).toLocaleString("pt-BR", {
@@ -459,18 +460,14 @@ function Cards({ ctx, kind }) {
   );
 }
 function Board({ ctx }) {
-  const { columns, opportunities } = ctx.data.kanban;
+  const columns = funnelColumns(ctx), opportunities = filteredOpportunities(ctx);
+  if (!selectedFunnel(ctx)) return <Empty>Crie seu primeiro funil em “Novo funil” para adicionar etapas e oportunidades.</Empty>;
   return (
     <>
       {columns.map((column, index) => {
         const items = opportunities.filter(
           (item) =>
-            String(item.column_id) === String(column.id) &&
-            (ctx.fields.funnelStatus === "all" ||
-              item.status === (ctx.fields.funnelStatus || "open")) &&
-            text(`${item.title} ${item.contact_name}`).includes(
-              text(ctx.fields.kanbanSearch),
-            ),
+            String(item.column_id) === String(column.id),
         );
         return (
           <section
@@ -642,6 +639,8 @@ function Board({ ctx }) {
       <Action
         id="kanbanAddStage"
         className="kanban-new-stage"
+        permission="funis.criar"
+        disabled={!selectedFunnel(ctx) || selectedFunnel(ctx)?.canManage === false}
         action={() => pageActions(ctx).addKanbanColumnBtn()}
       >
         ⊕ Adicionar etapa
@@ -704,11 +703,12 @@ export function pageActions(ctx) {
       const response = await fetch(`/api/contacts/export?${parameters}`, { credentials: 'include' });
       if (!response.ok) throw Error((await response.json()).error || 'Exportacao nao autorizada.');
       const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement('a'); link.href = url; link.download = 'contatos-bot-wap.csv'; link.click();
+      const link = document.createElement('a'); link.href = url; link.download = 'contatos-convelya.xlsx'; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
     manageGlobalVarsBtn: () => ctx.openEditor("globalVarsModal"),
     manageLossReasonsBtn: () => ctx.openEditor("lossReasonsModal"),
+    addFunnelBtn: () => createFunnel(ctx),
     addKanbanColumnBtn: () =>
       ctx.resource({
         title: "Nova etapa",
@@ -721,7 +721,7 @@ export function pageActions(ctx) {
           },
         ],
         save: async (values) => {
-          await api("/api/kanban/columns", "POST", values);
+          await api("/api/kanban/columns", "POST", { ...values, funnel_id: selectedFunnel(ctx)?.id });
           await ctx.load("kanban");
         },
       }),
@@ -1002,7 +1002,7 @@ export function pageAttributes(ctx, id, node) {
 }
 export function pageSlot(ctx, id, node) {
   if (id === 'dashboardAnalytics') return <Dashboard ctx={ctx} />;
-  if (id === 'reportExportSlot') return <Action className="text-action" permission="relatorios.exportar" action={async () => { const response = await fetch('/api/dashboard/export', { credentials: 'same-origin' }); if (!response.ok) throw new Error((await response.json()).error); const url = URL.createObjectURL(await response.blob()); const link = document.createElement('a'); link.href = url; link.download = 'relatorio-bot-wap.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }}>Exportar relatório</Action>;
+  if (id === 'reportExportSlot') return <Action className="text-action" permission="relatorios.exportar" action={async () => { const response = await fetch('/api/dashboard/export', { credentials: 'same-origin' }); if (!response.ok) throw new Error((await response.json()).error); const url = URL.createObjectURL(await response.blob()); const link = document.createElement('a'); link.href = url; link.download = 'relatorio-convelya.xlsx'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }}>Exportar relatório</Action>;
   const d = ctx.data,
     f = ctx.fields;
   if (id === "contactsNavCount" || id === "overviewContactTotal")
@@ -1241,7 +1241,7 @@ export function pageSlot(ctx, id, node) {
   )
     return `${ctx.editor?.item ? "Editar" : "Nova"} ${{ campaignModalTitle: "Campanha", flowModalTitle: "Fluxo", webhookModalTitle: "Webhook", opportunityModalTitle: "Oportunidade" }[id]}`;
   if (id === "opportunityColumnId")
-    return d.kanban.columns.map((column) => (
+    return funnelColumns(ctx).map((column) => (
       <option key={column.id} value={column.id}>
         {column.name}
       </option>
@@ -1257,9 +1257,10 @@ export function pageSlot(ctx, id, node) {
         ))}
       </>
     );
+  if (id === "funnelToolbar") return <FunnelToolbar ctx={ctx} />;
   if (id === "kanbanBoard") return <Board ctx={ctx} />;
   if (id === "kanbanMetrics") {
-    const all = d.kanban.opportunities,
+    const all = filteredOpportunities(ctx, false),
       won = all.filter((item) => item.status === "won"),
       lost = all.filter((item) => item.status === "lost");
     return (

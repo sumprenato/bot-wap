@@ -3,7 +3,24 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { mergeConversation, mergeConversationMap } = require('../conversation-update');
+const { mergeConversation, mergeConversationMap, mergeState } = require('../conversation-update');
+
+test('late snapshots and partial receipts preserve read status and respect removals and channel isolation', () => {
+  const message = { id: 1, from: 'admin', text: 'sent', deliveryStatus: 4 };
+  const conversation = { number: '123', messages: [message] };
+  const stale = { number: '123', messages: [{ ...message, deliveryStatus: 2 }] };
+  assert.equal(mergeConversation(conversation, stale).messages[0].deliveryStatus, 4);
+  assert.equal(mergeConversation(conversation, { ...stale, partialMessages: true }).messages[0].deliveryStatus, 4);
+  const missing = { ...message }; delete missing.deliveryStatus;
+  assert.equal(mergeConversation(conversation, { ...stale, messages: [missing] }).messages[0].deliveryStatus, 4);
+  const state = { chipId: 1, conversations: { '123': conversation } };
+  const snapshot = { chipId: 1, conversations: { '123': stale } };
+  assert.equal(mergeState(state, snapshot).conversations['123'].messages[0].deliveryStatus, 4);
+  assert.equal(mergeState(state, { ...snapshot, chipId: 2 }).conversations['123'].messages[0].deliveryStatus, 2);
+  assert.deepEqual(mergeState(state, { chipId: 1, conversations: {} }).conversations, {});
+  assert.deepEqual(mergeConversation(conversation, { number: '123', messages: [] }).messages, []);
+  assert.equal(mergeConversation({ ...conversation, messages: [{ ...message, deliveryStatus: 0 }] }, { ...conversation, messages: [{ ...message, deliveryStatus: 1 }] }).messages[0].deliveryStatus, 0, 'a stale pending snapshot cannot hide a send failure');
+});
 
 test('a receipt updates just its message without truncating history or duplicating records', () => {
   const previous = { number: '123', messages: Array.from({length:5000},(_,id)=>({id,at:new Date(id*1000).toISOString(),text:'message '+id})) };
@@ -58,6 +75,13 @@ test('history queries omit encrypted payloads, batch conversations, and delivery
   assert.equal(await store.updateMessageStatus('0-4',3),null,'repeated acknowledgements do not resend history');
   assert.equal(await store.updateMessageStatus('0-4',2),null,'older acknowledgements do not regress status');
   assert.equal((await store.updateMessageStatus('0-4',4)).messages[0].deliveryStatus,4);
+  await store.updateMessageStatus('0-6', 1);
+  assert.equal((await store.updateMessageStatus('0-6', 0)).messages[0].deliveryStatus, 0);
+  assert.equal(await store.updateMessageStatus('0-6', 1), null, 'a late pending echo does not erase the server rejection');
+  assert.equal((await store.updateMessageStatus('0-6', 2)).messages[0].deliveryStatus, 2, 'an actual server ack can recover a rejected retry');
+  const echoed = await store.addMessage(number, 'admin', 'Duplicate echo', '', {}, '0-5', 4, { delta: true });
+  assert.equal(echoed.messages[0].deliveryStatus, 4, 'history echoes update receipts even when the message already exists');
+  assert.equal((await store.addMessage(number, 'admin', 'Older echo', '', {}, '0-5', 2, { delta: true })).messages[0].deliveryStatus, 4);
   assert.equal((await db.get('SELECT COUNT(*) AS n FROM messages')).n,1200);
   assert.equal((await db.get("SELECT LENGTH(whatsapp_payload) AS n FROM messages LIMIT 1")).n,raw.length,'raw payload remains stored for replies and retries');
   const sent=await store.addMessage(number,'admin','Fast reply','',{},'new-fast-reply',1,{delta:true});

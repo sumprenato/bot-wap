@@ -91,6 +91,8 @@ async function bump(accountId) { await db.run('UPDATE accounts SET authorization
 
 // Explicit policy for every protected API, including requests made outside the UI.
 function routePermission(method, path) {
+  if (/^\/flows-assets(?:\/|$)/.test(path)) return method === 'GET' ? 'flow-media' : 'fluxos.editar';
+  if (/^\/flows\/[^/]+\/(publish|simulate|script-test|event|runs\/[^/]+\/(input|stop))$/.test(path) && method === 'POST') return 'fluxos.editar';
   if (['/logout', '/session', '/authorization', '/profile'].includes(path)) return null;
   if (path === '/state') return 'state';
   if (path === '/whatsapp/sync-contacts') return 'contacts-sync';

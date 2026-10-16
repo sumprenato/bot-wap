@@ -1,0 +1,106 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { chromium } = require('playwright');
+const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'bot-wap-funnel-ui-'));
+process.env.STORAGE_DIR = folder;
+process.env.ADMIN_USERNAME = 'funnel-ui'; process.env.ADMIN_PASSWORD = 'test-password';
+delete process.env.DATABASE_URL; delete process.env.DATABASE_PRIVATE_URL;
+const { server, io, bot, db } = require('../server');
+
+async function main() {
+  let browser;
+  try {
+    await db.ready;
+    bot.ensureWorker = () => ({ child: { connected: true } });
+    bot.request = async (_, action) => action === 'state' ? { conversations: {}, status: {} } : { ok: true };
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    browser = await chromium.launch({ headless: true, channel: process.env.UI_BROWSER || 'chrome' });
+    const context = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 950 } });
+    const api = async (url, data, method = 'post') => {
+      const response = await context.request[method](base + url, data ? { data } : {});
+      assert.ok(response.ok(), `${url}: ${await response.text()}`); return response.json();
+    };
+    await api('/api/login', { username: 'funnel-ui', password: 'test-password' });
+    const old = (await api('/api/kanban/columns', { name: 'Etapa existente' })).column;
+    await api('/api/kanban/opportunities', { title: 'Preservar esta oportunidade', column_id: old.id });
+    const page = await context.newPage(); const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.setDefaultTimeout(10000);
+    await page.goto(base + '/funis');
+    await page.getByText('Preservar esta oportunidade', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '+ Novo funil', exact: true }).click();
+    await page.getByLabel('Nome do funil', { exact: true }).fill('Comercial');
+    await page.locator('.resource-editor').getByRole('button', { name: 'Salvar', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('[aria-label="Selecionar funil"] option:checked')?.textContent === 'Comercial');
+    assert.equal(await page.locator('.kanban-column').count(), 0);
+    await page.locator('#kanbanAddStage').click();
+    await page.getByLabel('Nome da etapa', { exact: true }).fill('Prospecção');
+    await page.locator('.resource-editor').getByRole('button', { name: 'Salvar', exact: true }).click();
+    await page.getByText('Prospecção', { exact: true }).waitFor();
+    const data = await api('/api/kanban', null, 'get');
+    const commercial = data.funnels.find(item => item.name === 'Comercial');
+    const first = data.columns.find(item => item.funnel_id === commercial.id);
+    const second = (await api('/api/kanban/columns', { name: 'Negociação', funnel_id: commercial.id })).column;
+    await api('/api/kanban/opportunities', { title: 'Contrato Alfa', contact_number: '5511999911111', contact_name: 'Ana', column_id: first.id });
+    await api('/api/kanban/opportunities', { title: 'Contrato Beta', contact_number: '5511999922222', contact_name: 'Bruno', column_id: first.id });
+    await page.reload();
+    await page.getByText('Contrato Alfa', { exact: true }).waitFor();
+    assert.equal(await page.getByLabel('Selecionar funil').inputValue(), String(commercial.id), 'selected funnel survives reload');
+    assert.equal(await page.locator('.kanban-card').count(), 2);
+    await page.getByLabel('Etapa de Contrato Alfa').selectOption(String(second.id));
+    await page.locator(`[data-col-id="${second.id}"]`).getByText('Contrato Alfa', { exact: true }).waitFor();
+    await page.getByRole('button', { name: /^Filtros/ }).click();
+    let dialog = page.getByRole('dialog', { name: 'Filtros', exact: true });
+    await dialog.getByLabel('Busca por título ou contato', { exact: true }).fill('Alfa');
+    await dialog.getByLabel('Contato vinculado', { exact: true }).selectOption('5511999911111');
+    await dialog.getByLabel('Responsáveis', { exact: true }).selectOption('1');
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    await dialog.getByLabel('De', { exact: true }).fill(today);
+    await dialog.getByLabel('Até', { exact: true }).fill('2020-01-01');
+    await dialog.getByRole('button', { name: 'Aplicar filtros', exact: true }).click();
+    await dialog.getByRole('alert').waitFor();
+    await dialog.getByLabel('Até', { exact: true }).fill(today);
+    await dialog.getByRole('button', { name: 'Aplicar filtros', exact: true }).click();
+    assert.equal(await page.locator('.kanban-card').count(), 1);
+    const output = path.resolve(__dirname, '../.tmp/funnels-preview'); fs.mkdirSync(output, { recursive: true });
+    for (const theme of ['dark', 'light']) for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 950 });
+      await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+      await page.screenshot({ path: path.join(output, `${theme}-${width}.png`), fullPage: true });
+    }
+    await page.getByRole('button', { name: /^Filtros/ }).click();
+    await page.screenshot({ path: path.join(output, 'filters-mobile.png') });
+    await page.getByRole('dialog', { name: 'Filtros', exact: true }).getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+    assert.equal(await page.locator('.kanban-card').count(), 2);
+    await page.setViewportSize({ width: 1440, height: 950 });
+    await page.getByRole('button', { name: 'Configurações do funil', exact: true }).click();
+    await page.getByRole('button', { name: 'Ver histórico', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Histórico do funil', exact: true }).getByText(/movida de etapa/).waitFor();
+    await page.screenshot({ path: path.join(output, 'history.png') });
+    await page.getByRole('dialog').getByRole('button', { name: 'Fechar janela', exact: true }).click();
+    await page.getByRole('button', { name: 'Configurações do funil', exact: true }).click();
+    await page.getByRole('button', { name: 'Editar nome do funil', exact: true }).click();
+    await page.getByLabel('Nome do funil', { exact: true }).fill('Vendas');
+    await page.locator('.resource-editor').getByRole('button', { name: 'Salvar', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('[aria-label="Selecionar funil"] option:checked')?.textContent === 'Vendas');
+    await page.getByRole('button', { name: 'Configurações do funil', exact: true }).click();
+    await page.getByRole('button', { name: 'Apagar funil', exact: true }).click();
+    await page.locator('#confirmCancel').click();
+    assert.equal(await page.locator('.kanban-card').count(), 2);
+    await page.getByRole('button', { name: 'Configurações do funil', exact: true }).click();
+    await page.getByRole('button', { name: 'Apagar funil', exact: true }).click();
+    await page.locator('#confirmOk').click();
+    await page.getByText('Preservar esta oportunidade', { exact: true }).waitFor();
+    assert.equal((await api('/api/kanban', null, 'get')).funnels.length, 1);
+    assert.deepEqual(errors, []);
+    console.log('PASS: new/select/rename/delete funnels, independent stages and cards, reload, movement/history, all filters, date validation, cancellation, both themes and mobile.');
+  } finally {
+    await browser?.close(); await new Promise(resolve => io.close(resolve)); await db.close();
+    assert.equal(path.dirname(folder), os.tmpdir()); fs.rmSync(folder, { recursive: true, force: true });
+  }
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

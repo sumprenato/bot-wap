@@ -1,32 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api, phone } from "./api";
 import { Action, DataTable } from "./components";
 import { Icon } from "./icons";
+import { Modal } from "./modal";
 
-function ChipDialog({ title, close, children }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const previous = document.activeElement;
-    const panel = ref.current;
-    panel.querySelector("input,button,select")?.focus();
-    const keyboard = (event) => {
-      if (event.key === "Escape") { event.preventDefault(); close(); }
-      if (event.key === "Tab") {
-        const controls = [...panel.querySelectorAll("button,input,select,a[href]")].filter((item) => !item.disabled);
-        const first = controls[0], last = controls.at(-1);
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-      }
-    };
-    document.addEventListener("keydown", keyboard);
-    return () => { document.removeEventListener("keydown", keyboard); previous?.focus(); };
-  }, [close]);
-  return <div className="chip-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <section ref={ref} className="chip-modal" role="dialog" aria-modal="true" aria-labelledby="chip-dialog-title">
-      <header><h2 id="chip-dialog-title">{title}</h2><button type="button" className="chip-modal-close" aria-label="Fechar" onClick={close}>×</button></header>
-      {children}
-    </section>
-  </div>;
+function ChipDialog({ title, close, children, busy }) {
+  return <Modal className="chip-modal" label={title} onClose={close} busy={busy}>
+    <header><h2>{title}</h2></header>{children}
+  </Modal>;
 }
 
 export function Chips({ ctx }) {
@@ -65,7 +46,7 @@ export function Chips({ ctx }) {
           <Action className="chip-danger" action={async (event) => { event.currentTarget.closest("details").open = false; if (await ctx.confirm({ title: "Remover chip?", body: `O canal ${chip.name} será removido.`, okText: "Remover" })) { await api(`/api/chips/${chip.id}`, "DELETE"); await ctx.load("chips"); } }}>Remover chip</Action>
         </div></details></td>
       </tr>} />
-    {edit && ctx.can('chips.gerenciar') && <ChipDialog title={edit.id ? "Editar canal WhatsApp" : "Novo chip WhatsApp"} close={close}>
+    {edit && ctx.can('chips.gerenciar') && <ChipDialog title={edit.id ? "Editar canal WhatsApp" : "Novo chip WhatsApp"} close={close} busy={saving}>
       <p className="chip-modal-description">Conecte pelo QR Code, como no WhatsApp Web. O número será preenchido automaticamente após a leitura.</p>
       <form onSubmit={async (event) => { event.preventDefault(); if (saving) return; if (!name.trim() || !department) { setError("Informe o nome do canal e selecione um departamento."); return; } setSaving(true); setError(""); try {
         const result = await api(edit.id ? `/api/chips/${edit.id}/department` : "/api/chips", edit.id ? "PUT" : "POST", { name: name.trim(), departmentId: department });

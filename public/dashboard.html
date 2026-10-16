@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel — Bot WAP</title>
-  <meta name="description" content="Painel de atendimento Bot WAP — gerencie conversas WhatsApp em tempo real." />
+  <title>Painel — Convelya</title>
+  <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/images/favicon.svg?v=20261016-1" />
+  <meta name="description" content="Convelya organiza conversas, equipe e resultados em um só lugar." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -18,6 +19,7 @@
   <link rel="stylesheet" href="/assets/css/responsive.css?v=20261014-1" />
   <link rel="stylesheet" href="/assets/css/premium.css?v=20261015-3" />
   <link rel="stylesheet" href="/assets/css/charts.css?v=20261015-2" />
+  <link rel="stylesheet" href="/assets/css/modals.css?v=20261016-1" />
   <script defer src="/assets/js/site.js?v=20261015-3"></script>
 </head>
 <body>
@@ -25,9 +27,9 @@
     <!-- ===================== NAV SIDEBAR ===================== -->
     <aside class="sidebar nav-sidebar" id="appNavigation">
       <div class="brand">
-        <span class="brand-logo" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="m7 9 2 5 3-5 3 5 2-5"/></svg></span>
+        <span class="brand-logo" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="M16 9a5 5 0 1 0 0 6"/></svg></span>
         <div class="brand-copy">
-          <h1>Bot WAP</h1>
+          <h1>Convelya</h1>
           <span class="brand-subtitle">O espaço das suas conversas.</span>
         </div>
 
@@ -278,10 +280,11 @@
               <p>Acompanhe cada oportunidade, do primeiro contato ao fechamento.</p>
             </div>
             <div class="page-heading-actions">
-              <button class="text-action text-action--primary" type="button" id="addKanbanColumnBtn">+ Nova etapa</button>
+              <button class="text-action text-action--primary" type="button" id="addFunnelBtn">+ Novo funil</button>
               <button class="text-action" type="button" id="manageLossReasonsBtn">Motivos de Perda</button>
             </div>
           </header>
+          <div id="funnelToolbar"></div>
           <div class="kanban-metrics" id="kanbanMetrics"></div>
           <label class="table-select funnel-status-filter" for="funnelStatus"><span>Exibir oportunidades</span><select id="funnelStatus"><option value="open">Em andamento</option><option value="won">Ganhas</option><option value="lost">Perdidas</option><option value="all">Todas</option></select></label>
           <label class="table-search kanban-search" for="kanbanSearch"><input type="search" id="kanbanSearch" aria-label="Buscar oportunidade ou contato" placeholder="Buscar oportunidade ou contato" /></label><div class="kanban-board" id="kanbanBoard" role="region" tabindex="0" aria-label="Etapas e oportunidades"></div>
@@ -348,7 +351,7 @@
             <div class="editor-panel">
               <div class="editor-head"><div><h2 id="importContactsTitle">Importar contatos</h2><p class="editor-description">Os contatos serão salvos no chip principal, mesmo se o WhatsApp estiver desconectado.</p></div></div>
               <form id="importContactsForm" class="profile-form">
-                <p class="import-help" id="importContactsHelp">Escolha um CSV UTF-8 de até 2 MB e 5.000 linhas, separado por ponto e vírgula ou vírgula. Use a coluna <strong>Telefone</strong> com DDI + DDD + número. <strong>Nome</strong> e <strong>Rótulos</strong> são opcionais. O CSV exportado pelo painel também é aceito.</p>
+                <p class="import-help" id="importContactsHelp">Escolha um CSV UTF-8 de até 2 MB e 5.000 linhas, separado por ponto e vírgula ou vírgula. Use a coluna <strong>Telefone</strong> com DDI + DDD + número. <strong>Nome</strong> e <strong>Rótulos</strong> são opcionais. Para importar uma planilha Excel, salve-a como CSV UTF-8.</p>
                 <p class="import-help">Telefones repetidos serão agrupados. Contatos existentes terão o nome atualizado quando preenchido, e os rótulos serão somados aos atuais. Linhas inválidas serão listadas no resultado.</p>
                 <button type="button" class="text-action" id="downloadContactsTemplate">Baixar modelo CSV</button>
                 <div class="profile-field"><label for="importContactsFile">Arquivo CSV</label><input type="file" id="importContactsFile" accept=".csv,text/csv" aria-describedby="importContactsHelp" required></div>

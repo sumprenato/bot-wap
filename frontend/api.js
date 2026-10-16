@@ -96,7 +96,7 @@ export async function api(path, method = "GET", payload) {
   }
   return data;
 }
-export function downloadCsv(rows, filename = "contatos-bot-wap.csv") {
+export function downloadCsv(rows, filename = "contatos-convelya.csv") {
   const cell = (value) => {
     let text = String(value || "");
     if (/^[=+@\-\t\r\n]/.test(text)) text = "'" + text;

@@ -156,7 +156,7 @@ function initializeWorkspace() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'contatos-bot-wap.csv';
+    link.download = 'contatos-convelya.csv';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });

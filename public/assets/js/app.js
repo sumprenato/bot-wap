@@ -1,5 +1,5 @@
 /* =====================================================
-   BOT WAP — app.js
+   CONVELYA — app.js
    Versão: 20260924-3 (v5.0)
    ===================================================== */
 
@@ -1210,7 +1210,7 @@ function showPage(page, pushState = true) {
   activePage = page;
   document.querySelector('.app').classList.toggle('app--management', page !== 'inbox');
   const pageLabel = document.querySelector(`[data-page-view="${page}"] .page-heading h2`);
-  document.getElementById('currentPageLabel').textContent = page === 'inbox' ? 'Atendimento' : pageLabel?.textContent || 'Bot WAP';
+  document.getElementById('currentPageLabel').textContent = page === 'inbox' ? 'Atendimento' : pageLabel?.textContent || 'Convelya';
 
   document.querySelectorAll('[data-page-view]').forEach((view) => {
     const isActive = view.dataset.pageView === page;
@@ -1235,19 +1235,19 @@ function showPage(page, pushState = true) {
     }
     // Update page <title>
     const titles = {
-      inbox:    'Atendimento — Bot WAP',
-      overview: 'Dashboard — Bot WAP',
-      kanban:   'Funis — Bot WAP',
-      campaigns:'Campanhas — Bot WAP',
-      flows:    'Fluxos — Bot WAP',
-      contacts: 'Contatos — Bot WAP',
-      webhooks: 'Webhooks — Bot WAP',
-      departments: 'Departamentos — Bot WAP',
-      tags: 'Tags e rótulos — Bot WAP',
-      chips: 'Meus chips — Bot WAP',
-      settings: 'Configurações — Bot WAP',
+      inbox:    'Atendimento — Convelya',
+      overview: 'Dashboard — Convelya',
+      kanban:   'Funis — Convelya',
+      campaigns:'Campanhas — Convelya',
+      flows:    'Fluxos — Convelya',
+      contacts: 'Contatos — Convelya',
+      webhooks: 'Webhooks — Convelya',
+      departments: 'Departamentos — Convelya',
+      tags: 'Tags e rótulos — Convelya',
+      chips: 'Meus chips — Convelya',
+      settings: 'Configurações — Convelya',
     };
-    document.title = titles[page] || 'Bot WAP';
+    document.title = titles[page] || 'Convelya';
   }
 
   if (page === 'contacts')  refreshContacts().catch(reportPageError);
